@@ -16,7 +16,7 @@ the Client's boostrap logo using electron.net
 
 # helpful resource for terminolgoy 
 
-you can find in this repo wiki  
+you can find in this repo wiki  https://github.com/PrestigeDevop/DNA-platform/wiki/some-terminology
 an overview of these computational techniques used in life sciences.  suitable for introductory explanations or quick references in the field 
 
 
