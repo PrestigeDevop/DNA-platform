@@ -24,4 +24,9 @@ an overview of these computational techniques used in life sciences.  suitable f
 
 TODO
 
+# addtional resources ;
+
+https://dmice.ohsu.edu/bd2k/topics.html
+
+
 
