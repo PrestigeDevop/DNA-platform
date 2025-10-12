@@ -1,16 +1,17 @@
 # DNA-platform
-Denovo automata platform , is an ongoin project for life science using open source tools  to support open science community
-in a nutshell, it's like discovery studio and openeye's toolsets but open source 
+Denovo automata platform , is an ongoin project for Computational life sciences using open source tools  to support  citizen scinence community
+in a nutshell, it's like  discovery studio and openeye's toolsets but open source 
 #
 
 # Built using dotnet runtime 
 
 with FFI - IPC and transpilation of other tools writen in other languages .
 
+and might be possible to be extendable with cloud native computing foundation tools like dapr,,Synapse,kuberflow etc..
 
 # screenshots for the client apps:
 
-the Client's boostrap logo using electron.net
+the Client's GUI BCL boostrap logo using electron.net
 
 ![splash](https://github.com/user-attachments/assets/a8910511-3eed-4960-a697-11852f9d135f)
 
