@@ -28,9 +28,10 @@ TODO;
 
 # addtional resources ;
 
-https://dmice.ohsu.edu/bd2k/topics.html
-
 -https://www.thesgc.org/target2035
 
+https://dmice.ohsu.edu/bd2k/topics.html
+
+https://github.com/biovcnet/biovcnet.github.io/wiki/
 
 
