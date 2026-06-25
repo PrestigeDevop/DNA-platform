@@ -12,7 +12,7 @@ and might be possible to be extendable with cloud native computing foundation to
 
 # screenshots for the client apps:
 
-the Client's GUI BCL boostrap logo using electron.net
+The Client's GUI BCL bootstrap logo using electron.net
 
 ![splash](https://github.com/user-attachments/assets/a8910511-3eed-4960-a697-11852f9d135f)
 
@@ -26,12 +26,16 @@ an overview of these computational techniques used in life sciences.  suitable f
 
 TODO;
 
-# addtional resources ;
+# additional resources ;
 
 -https://www.thesgc.org/target2035
 
-https://dmice.ohsu.edu/bd2k/topics.html
+https://docs.openfree.energy/en/stable/index.html
+https://www.ks.uiuc.edu/Training/Tutorials/#
+https://www.openbiosim.org/
+https://github.com/NVIDIA-BioNeMo/bionemo-agent-toolkit
 
+https://dmice.ohsu.edu/bd2k/topics.html
 https://github.com/biovcnet/biovcnet.github.io/wiki/
 
 
