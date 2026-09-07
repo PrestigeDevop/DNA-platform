@@ -32,3 +32,18 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Node / SvelteKit
+node_modules/
+.svelte-kit/
+build/
+vite_build.log
+
+# Prisma / SQLite
+*.db
+*.db-journal
+
+# Temp files
+_probe*.txt
+_test_*.json
+state_check.*

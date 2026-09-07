@@ -38,9 +38,16 @@ public class AgentManager : IAgentManager
         return Task.CompletedTask;
     }
 
-    public Task<IEnumerable<string>> ListAgents()
+        public Task<IEnumerable<AgentSummary>> ListAgents()
     {
-        return Task.FromResult<IEnumerable<string>>(_agents.Keys);
+        var summaries = _agents.Select(kvp => new AgentSummary
+        {
+            Id = kvp.Key,
+            Name = (kvp.Value as DefaultAgent)?.Name ?? kvp.Value.AgentId,
+            Type = (kvp.Value as DefaultAgent)?.AgentType ?? kvp.Value.GetType().Name,
+            Prompt = (kvp.Value as DefaultAgent)?.SystemPrompt
+        }).ToList();
+        return Task.FromResult<IEnumerable<AgentSummary>>(summaries);
     }
 }
 
@@ -53,11 +60,17 @@ public class DefaultAgent : IAgent
     private readonly ILogger<AgentManager> _logger;
     private readonly Dictionary<string, ISkill> _skills;
 
-    public string AgentId { get; }
+        public string AgentId { get; }
+    public string Name { get; private set; }
+    public string AgentType { get; private set; }
+    public string? SystemPrompt { get; private set; }
 
     public DefaultAgent(string agentId, AgentConfig config, ILogger<AgentManager> logger)
     {
         AgentId = agentId;
+        Name = config.Name;
+        AgentType = config.AgentType;
+        SystemPrompt = config.SystemPrompt;
         _config = config;
         _logger = logger;
         _skills = new Dictionary<string, ISkill>();

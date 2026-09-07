@@ -7,6 +7,37 @@
 - **Visual Studio Code** or **Visual Studio 2022+** (recommended)
 - **Node.js 18+** (for DevUI later)
 
+## ⚠️ Current Polyglot Reality (Read First!)
+
+**The system is no longer a monolithic .NET project.** Before proceeding, understand:
+
+### Stack Structure
+| Layer | Technology | Responsibility |
+|-------|------------|----------------|
+| **Frontend** | SvelteKit + TypeScript | CRUD ops, UI, validation; runs on port 5173 |
+| **Backend API** | ASP.NET Core 8 Minimal APIs | Workflow execution, skill compute; runs on port 5254 |
+| **Persistence** | Prisma + SQLite (dev) | Audit trail for workflows & executions; JSON blobs store graphs |
+
+### Key Constraints to Accept
+- ✅ **Workflows as JSON strings**: Stored in `Workflow` table (nodes/connections serialized by Prisma)
+- ✅ **No native graph DB**: Reconstruct DAGs from flat structures when needed  
+- ✅ **HTTP proxy calls**: SvelteKit → local .NET via `server.ts` proxy; not direct SQL or gRPC
+- ✅ **Console demo is console-only**: Still works, but use DevUI for full experience
+
+### Legacy Assumptions (Deprecated!)
+❌ Don't assume you can hit `/api/workflows/...` directly from browser in production  
+❌ Don't write raw SQL queries against the `.db` file (use Prisma or .NET EF Core)  
+❌ Don't expect a monolithic app with all routes under one host/port  
+❌ Don't treat `src/03_AgentWorkflowPatterns/DNAPlatform.AgentFramework` as production-ready API  
+
+### Getting Started Today
+1. **Build the whole system**: `dotnet build` (restores .NET deps)
+2. **Run SvelteKit**: Navigate to `src/05_DevUI/`, run `npm install && npm run dev`  
+3. **Or use console demo for compute-only testing** (no persistence, good for validating patterns)
+
+---
+
+## Prerequisites
 ## Project Setup
 
 ### 1. Clone & Initial Build

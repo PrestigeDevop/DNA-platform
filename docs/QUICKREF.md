@@ -1,6 +1,61 @@
 # Quick Reference - DNA Platform
 
-## Building & Running
+## ⚡ Current Polyglot Reality (2026-09-06)
+
+**The system is now polyglot: SvelteKit frontend + .NET backend.** 
+
+### System Architecture
+```
+┌──────────────────────────────┐   HTTP Proxy    ┌─────────────────────────────┐
+│  DevUI (SvelteKit, port 5173) │ ◄────────────► │  Backend API (.NET Core,     │
+│                               │   server.ts     │  port 5254)                 │
+│  • CRUD operations            │────────────────│  • Workflow execution        │
+│  • UI / Validation            │                │  • Skill registry            │
+└──────────────────────────────┘                 └─────────────────────────────┘
+         │                                             │
+         ▼                                             ▼
+    Prisma + SQLite (dev)                        Local in-memory (prod demo)
+    Workflow | Execution tables                  NodeExecutor, AgentManager
+```
+
+### Key Differences from "Legacy" Docs
+| Legacy Assumption | Current Reality |
+|-------------------|-----------------|
+| Monolithic app with all routes | Split: DevUI + Backend API via HTTP proxy |
+| All compute in one service | SvelteKit (CRUD) ↔ .NET (compute) |
+| Direct DB access from frontend | Frontend uses SvelteKit; DB is backend only |
+| Console demo = complete system | Console = compute-only; use DevUI for full stack |
+
+### Getting Started Today
+```bash
+# Build everything
+dotnet build
+
+# Run console demo (compute-only, no persistence)
+cd src/03_AgentWorkflowPatterns/DNAPlatform.AgentWorkflowPatterns.ConsoleApp
+dotnet run
+
+# For full experience: start DevUI separately (see DEVELOPMENT.md)
+cd src/05_DevUI
+npm install
+npm run dev
+```
+
+### API Endpoints (Backend only - port 5254)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/swagger` | Swagger/OpenAPI UI |
+| POST | `/api/workflows/execute` | Execute workflow |
+| GET | `/api/workflows/{id}` | Get workflow details |
+| (CRUD via DevUI) | - | SvelteKit handles create/read/update/delete |
+
+### Important Constraints
+- ✅ Workflows stored as **JSON strings** in SQLite (not native graph DB)  
+- ✅ **HTTP proxy calls** for inter-service communication (no sockets/gRPC)  
+- ✅ Console demo works standalone; DevUI provides full experience  
+- ❌ Don't use legacy route assumptions (e.g., direct browser → `/api/...`)  
+
+---
 
 ```bash
 # Build all projects

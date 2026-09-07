@@ -130,8 +130,8 @@ DNA-platform/
 │   │   │   └── AgentManager.cs                   (Agents & skills)
 │   │   └── ConsoleApp/                          ✅ Working demo
 │   │       └── Program.cs                        (3 patterns)
-│   ├── 04_WorkflowEngine/                       (TODO)
-│   ├── 05_DevUI/                                (TODO)
+│   ├── 04_WorkflowEngine/                       (TODO?)
+│   ├── 05_DevUI/                                (done)
 │   ├── 06_Skills/                               (TODO)
 │   └── 07_PolyglotRuntime/                      (TODO)
 ├── test/

@@ -1,0 +1,49 @@
+/// <reference types="node" />
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Workflow {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  nodes       String?   // WorkflowNode[] serialized as JSON string (SQLite has no Json type)
+  connections String?   // NodeConnection[] serialized as JSON string
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  executions  Execution[]
+}
+
+model Agent {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   @default("StandardAgent")
+  prompt      String?
+  model       String?  @default("gpt-4")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Execution {
+  id              String   @id @default(cuid())
+  workflowId      String?
+  workflowName    String?
+  status          String   @default("Pending")
+  startTime       DateTime @default(now())
+  endTime         DateTime?
+  duration        Float?   // milliseconds
+  outputs         String?  // execution outputs serialized as JSON string
+  errors          String?  // execution errors serialized as JSON string
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  workflow        Workflow? @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+
+  @@index([workflowId])
+}

@@ -212,6 +212,11 @@ public class WorkflowOrchestrator : IWorkflowOrchestrator
         {
             return Task.FromResult(execution);
         }
-        throw new KeyNotFoundException($"Execution not found: {executionId}");
+                throw new KeyNotFoundException($"Execution not found: {executionId}");
+    }
+
+    public IEnumerable<WorkflowExecution> ListExecutions()
+    {
+        return _executions.Values;
     }
 }

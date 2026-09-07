@@ -56,22 +56,114 @@ DNA Platform enables bioinformaticians to:
 - **REST API** for workflow management
 - **Real-time execution monitoring**
 
-## 🚀 Quick Start
+## 🚀 Quick Start (DevUI Web App)
 
-### Installation
+### Prerequisites
+- **.NET 8.0+ SDK** installed
+- **Node.js 20+** installed  
+- **Git** (optional, for version control)
 
+### One-Command Setup
 ```bash
-# Clone repository
-git clone https://github.com/PrestigeDevop/DNA-platform.git
-cd DNA-platform/prestigedevop-bioinformatic-workflow-platform
+run-all.bat
+```
 
-# Restore dependencies
+This starts:
+- **Backend API**: http://localhost:5254 (Swagger: `/swagger`)
+- **Frontend DevUI**: http://localhost:5173
+
+### Detailed Manual Setup
+
+#### 1. Clone & Restore
+```bash
+git clone https://github.com/PrestigeDevop/DNA-platform.git
+cd DNA-platform
+
+# Restore .NET dependencies
 dotnet restore
 
 # Build solution
 dotnet build
+```
 
-# Run demo
+#### 2. Install Frontend Dependencies
+```bash
+cd src\05_DevUI\DNAPlatform.DevUI.Web
+npm install
+cd ..\..\..\..
+```
+
+#### 3. Run the System
+From main directory:
+```bash
+run-all.bat
+```
+
+Or run separately:
+
+**Backend only:**
+```bash
+cd src\05_DevUI\DNAPlatform.DevUI.API\DNAPlatform.DevUI.API
+dotnet run --urls http://localhost:5254
+```
+
+**Frontend only (Svelte):**
+```bash
+cd src\05_DevUI\DNAPlatform.DevUI.Web
+npm install
+npm run dev
+```
+
+### Access Points
+
+| Service | URL | Notes |
+|---------|-----|-------|
+| Frontend (SvelteKit + Prisma) | http://localhost:5173 | Main UI; persists workflows/agents/executions in SQLite |
+| Backend API (.NET 8) | http://localhost:5254 | Workflow execution engine + skills |
+| Swagger docs | http://localhost:5254/swagger | REST API reference |
+| Health check | http://localhost:5254/health | Also proxied at http://localhost:5173/health |
+
+### Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Port 5254 already in use | Change port in `run-all.bat` or kill the process using it |
+| Port 5173 already in use | Change port in `vite.config.ts` or kill the process using it |
+| `npm install` fails | Clear cache: `npm cache clean --force` then retry |
+| `dotnet run` fails | Run `dotnet restore` and `dotnet build` first |
+| Frontend can't connect to backend | Ensure backend is running on port 5254 (check proxy in vite.config.ts) |
+
+### First Time Setup (Combined Steps)
+```bash
+# Clone repository (if not done)
+git clone https://github.com/PrestigeDevop/DNA-platform.git
+cd DNA-platform
+
+# Restore .NET dependencies
+dotnet restore
+
+# Build the solution
+dotnet build
+
+# Install frontend dependencies
+cd src\05_DevUI\DNAPlatform.DevUI.Web
+npm install
+
+# Run everything
+cd ..\..\..\..
+run-all.bat
+```
+
+### Next Steps
+1. Open http://localhost:5173 in your browser
+2. Navigate to **Workflows** to create your first workflow
+3. Check **Skills** to see available bioinformatic skills
+4. Monitor **Executions** to track workflow progress
+5. Manage **Agents** to configure AI agents
+
+### Console demo (agent framework patterns)
+
+```bash
 cd src/03_AgentWorkflowPatterns/DNAPlatform.AgentWorkflowPatterns.ConsoleApp
 dotnet run
 ```
@@ -86,23 +178,31 @@ The console app demonstrates three workflow patterns:
 
 ```
 DNA-platform/
+├── run-all.bat                              # Single entry point: starts API + UI
+├── docs/                                    # All documentation
+│   ├── ARCHITECTURE.md                      # Detailed design
+│   ├── DEVELOPMENT.md                       # Development guide
+│   ├── QUICKSTART.md                        # Step-by-step setup
+│   ├── TODO.md                              # Current task list
+│   └── DEVELOPMENT_LOG.md                   # Progress log
 ├── src/
-│   ├── 03_AgentWorkflowPatterns/          # PRIMARY WORKING AREA ✅
-│   │   ├── DNAPlatform.AgentFramework/    # Core engine (stable)
-│   │   └── ConsoleApp/                    # Demo application (working)
-│   ├── 04_WorkflowEngine/                 # Advanced patterns (TODO)
-│   ├── 05_DevUI/                          # ASP.NET Core API (TODO)
-│   ├── 06_Skills/                         # Bioinformatic skills (TODO)
-│   └── 07_PolyglotRuntime/                # Language interop (TODO)
-├── ARCHITECTURE.md                        # Detailed design
-├── DEVELOPMENT.md                         # Development guide
-└── README.md                              # This file
+│   ├── 03_AgentWorkflowPatterns/            # Core agent framework (stable)
+│   │   └── DNAPlatform.AgentFramework/      # Engine: orchestrator, agents, skills
+│   └── 05_DevUI/                            # Web UI + API (active)
+│       ├── DNAPlatform.DevUI.API/           # .NET 8 REST API (port 5254)
+│       └── DNAPlatform.DevUI.Web/           # SvelteKit UI + Prisma/SQLite (port 5173)
+├── DNAPlatform.sln                          # .NET solution
+└── README.md                                # This file
 ```
 
 ## 📖 Documentation
 
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System design, execution model, service contracts
-- **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Getting started, examples, testing, debugging
+All docs live in **[docs/](./docs/)**:
+- **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - System design, execution model, service contracts
+- **[docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md)** - Getting started, examples, testing, debugging
+- **[docs/QUICKSTART.md](./docs/QUICKSTART.md)** - Step-by-step setup guide
+- **[docs/TODO.md](./docs/TODO.md)** - Current task list
+- **[docs/DEVELOPMENT_LOG.md](./docs/DEVELOPMENT_LOG.md)** - Progress log
 
 ## 🛣️ Roadmap
 
@@ -180,7 +280,7 @@ Contributions welcome! Please:
   - [Open Free Energy](https://www.openfree.energy/)
   - [OpenBioSim](https://www.openbiosim.org/)
   - [NVIDIA BioNeMo](https://github.com/NVIDIA-BioNeMo/bionemo-agent-toolkit)
-  - [Kubeflow](https://www.kubeflow.org/) | [MageAI](https://www.mage.ai/)
+  - [Kubeflow](https://www.kubeflow.org/) 
 
 ## 📄 License
 
