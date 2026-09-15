@@ -6,6 +6,8 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![.NET](https://img.shields.io/badge/.NET-8.0+-blue)
 
+<img width="1237" height="594" alt="image" src="https://github.com/user-attachments/assets/1d262d63-315d-43a4-a159-458e37a7b9e0" />
+
 ## 🎯 Overview
 
 DNA Platform enables bioinformaticians to:
