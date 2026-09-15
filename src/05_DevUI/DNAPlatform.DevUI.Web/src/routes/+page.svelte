@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from '$lib/services/api';
+  import { captureConsole } from '$lib/services/logs';
   
   let health: any = null;
   let skills: any[] = [];
@@ -12,6 +13,8 @@
   let dbError = '';    // Prisma/SQLite issues
   
   onMount(async () => {
+    captureConsole();
+    
     // 1) Backend connectivity (proxied to .NET on :5254)
     try {
       health = await api.health();
@@ -138,10 +141,14 @@
           <span class="action-icon">🔍</span>
           <span>Browse Skills</span>
         </a>
-        <button class="action-btn" on:click={createSampleWorkflow}>
+                <button class="action-btn" on:click={createSampleWorkflow}>
           <span class="action-icon">🚀</span>
           <span>Run Sample</span>
         </button>
+        <a href="/logs" class="action-btn">
+          <span class="action-icon">🔧</span>
+          <span>View Logs</span>
+        </a>
       </div>
     </div>
     

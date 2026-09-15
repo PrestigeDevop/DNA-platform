@@ -28,8 +28,8 @@
           <span>Type: <strong>{result.data?.type}</strong></span>
           <span>Duration: <strong>{result.durationMs}ms</strong></span>
         </div>
-        {#if result.data?.alert_id}
-          <div class="msgbox-id">ID: {result.data.alert_id}</div>
+                        {#if result.data?.alertId}
+          <div class="msgbox-id">ID: {result.data.alertId}</div>
         {/if}
       </div>
       <div class="msgbox-footer">

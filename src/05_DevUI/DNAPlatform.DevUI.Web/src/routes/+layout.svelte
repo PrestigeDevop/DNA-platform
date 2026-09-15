@@ -9,7 +9,8 @@
     { path: '/workflows', label: 'Workflows', icon: '🔄' },
     { path: '/skills', label: 'Skills', icon: '🧩' },
     { path: '/executions', label: 'Executions', icon: '⚡' },
-    { path: '/agents', label: 'Agents', icon: '🤖' },
+        { path: '/agents', label: 'Agents', icon: '🤖' },
+    { path: '/logs', label: 'Logs', icon: '🔧' },
     { path: '/about', label: 'About', icon: 'ℹ️' }
   ];
   

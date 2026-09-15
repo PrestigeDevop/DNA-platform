@@ -64,6 +64,29 @@ namespace DNAPlatform.Skills
             _skills.TryAdd(sequenceAlignerSkill.SkillId, sequenceAlignerSkill);
 
             _logger?.LogInformation("Registered {Count} built-in skills", _skills.Count);
+
+            // Dump the catalogue at startup so the CLI console immediately shows
+            // which skills are available (and makes it obvious when one is missing).
+            foreach (var skill in _skills.Values.OrderBy(s => s.SkillId))
+            {
+                _logger?.LogInformation(
+                    "  • {SkillId,-22} {Name} [{Category}]",
+                    skill.SkillId,
+                    skill.Name,
+                    skill.Category);
+            }
+        }
+
+        /// <summary>
+        /// Attaches the structured <see cref="SkillInputField"/> list to the metadata so the
+        /// GUI can render a typed parameter editor. Done centrally here so individual skills
+        /// only need to override <see cref="ISkill.GetInputFields"/>.
+        /// </summary>
+        private static SkillMetadata BuildMetadata(ISkill skill)
+        {
+            var metadata = skill.GetMetadata();
+            metadata.InputFields = skill.GetInputFields() ?? new List<SkillInputField>();
+            return metadata;
         }
 
         public Task RegisterSkill(string skillId, ISkill skill)
@@ -105,7 +128,7 @@ namespace DNAPlatform.Skills
 
         public Task<IEnumerable<SkillMetadata>> ListSkills()
         {
-            var skills = _skills.Values.Select(s => s.GetMetadata()).ToList();
+            var skills = _skills.Values.Select(BuildMetadata).ToList();
             return Task.FromResult<IEnumerable<SkillMetadata>>(skills);
         }
 
@@ -113,7 +136,7 @@ namespace DNAPlatform.Skills
         {
             var skills = _skills.Values
                 .Where(s => s.Category.Equals(category, StringComparison.OrdinalIgnoreCase))
-                .Select(s => s.GetMetadata())
+                .Select(BuildMetadata)
                 .ToList();
 
             return Task.FromResult<IEnumerable<SkillMetadata>>(skills);
@@ -123,14 +146,42 @@ namespace DNAPlatform.Skills
         {
             if (!_skills.TryGetValue(skillId, out var skill))
             {
+                _logger?.LogWarning("Skill not found: {SkillId}", skillId);
                 return SkillOutput.CreateError($"Skill not found: '{skillId}'");
             }
 
             try
             {
-                _logger?.LogInformation("Executing skill: {SkillId}", skillId);
+                var providedKeys = inputs == null ? "-" : string.Join(", ", inputs.Keys);
+                _logger?.LogInformation(
+                    "Executing skill {SkillId} with params [{Params}]",
+                    skillId,
+                    providedKeys);
+
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
                 var result = await skill.Execute(inputs);
-                _logger?.LogInformation("Skill {SkillId} executed: Success={Success}", skillId, result.Success);
+                stopwatch.Stop();
+
+                // The skill may not measure itself - stamp the wall-clock duration so the
+                // CLI log, the API response and the web log viewer all agree.
+                if (result.DurationMs <= 0)
+                    result.DurationMs = stopwatch.ElapsedMilliseconds;
+
+                if (result.Success)
+                {
+                    _logger?.LogInformation(
+                        "Skill {SkillId} succeeded in {DurationMs}ms",
+                        skillId,
+                        result.DurationMs);
+                }
+                else
+                {
+                    _logger?.LogWarning(
+                        "Skill {SkillId} failed: {Error}",
+                        skillId,
+                        result.ErrorMessage);
+                }
+
                 return result;
             }
             catch (Exception ex)
