@@ -8,24 +8,30 @@
   let agents: any[] = [];
   let executions: any[] = [];
   let loading = true;
-  let error = '';
+  let error = '';      // .NET backend connectivity
+  let dbError = '';    // Prisma/SQLite issues
   
   onMount(async () => {
+    // 1) Backend connectivity (proxied to .NET on :5254)
     try {
-      // Fetch from .NET backend
       health = await api.health();
       skills = await api.getSkills();
-      
-      // Fetch from SvelteKit server endpoints (Prisma)
-      workflows = await api.getWorkflows();
-      agents = await api.getAgents();
-      executions = await api.getExecutions();
-      
-      loading = false;
     } catch (e) {
       error = 'Failed to connect to backend. Make sure the API is running on port 5254.';
       loading = false;
+      return;
     }
+
+    // 2) Database-backed data (SvelteKit server routes + Prisma/SQLite)
+    try {
+      workflows = await api.getWorkflows();
+      agents = await api.getAgents();
+      executions = await api.getExecutions();
+    } catch (e) {
+      dbError = 'Database (SQLite/Prisma) unavailable — workflows, agents and executions lists are disabled. Run build-frontend.bat to set up the database.';
+    }
+
+    loading = false;
   });
   
   async function createSampleWorkflow() {
@@ -68,6 +74,12 @@
       <p class="hint">Run <code>run-all.bat</code> to start both backend and frontend.</p>
     </div>
   {:else}
+    {#if dbError}
+      <div class="warning-card">
+        <h3>⚠️ Database Warning</h3>
+        <p>{dbError}</p>
+      </div>
+    {/if}
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon">🔄</div>
@@ -158,6 +170,9 @@
   .error-card { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 0.5rem; padding: 1.5rem; }
   .error-card h3 { color: #ef4444; margin: 0 0 0.5rem 0; }
   .error-card p { color: #fca5a5; margin: 0; }
+  .warning-card { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+  .warning-card h3 { color: #f59e0b; margin: 0 0 0.5rem 0; }
+  .warning-card p { color: #fcd34d; margin: 0; }
   .hint { margin-top: 1rem !important; font-size: 0.875rem; }
   .hint code { background: rgba(0, 0, 0, 0.3); padding: 0.25rem 0.5rem; border-radius: 0.25rem; }
   .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }

@@ -11,8 +11,8 @@ echo Starting Backend API on http://localhost:5254 ...
 echo Starting Frontend on http://localhost:5173 ...
 echo.
 
-:: Start Backend in a new window
-start "DNA Platform Backend" cmd /k "cd /d %~dp0src\05_DevUI\DNAPlatform.DevUI.API\DNAPlatform.DevUI.API && dotnet run --urls http://localhost:5254"
+:: Start Backend in a new window (project root is the parent folder - nested duplicate removed)
+start "DNA Platform Backend" cmd /k "cd /d %~dp0src\05_DevUI\DNAPlatform.DevUI.API && dotnet run --urls http://localhost:5254"
 
 :: Wait until the backend health endpoint responds (max ~30s)
 set /a tries=0

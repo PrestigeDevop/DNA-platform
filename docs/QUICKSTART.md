@@ -18,7 +18,7 @@ This will:
  
 **Backend only:** 
 ``` 
-cd src\05_DevUI\DNAPlatform.DevUI.API\DNAPlatform.DevUI.API
+cd src\05_DevUI\DNAPlatform.DevUI.API
 dotnet run --urls http://localhost:5254
 ``` 
  

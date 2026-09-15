@@ -9,7 +9,8 @@
     { path: '/workflows', label: 'Workflows', icon: '🔄' },
     { path: '/skills', label: 'Skills', icon: '🧩' },
     { path: '/executions', label: 'Executions', icon: '⚡' },
-    { path: '/agents', label: 'Agents', icon: '🤖' }
+    { path: '/agents', label: 'Agents', icon: '🤖' },
+    { path: '/about', label: 'About', icon: 'ℹ️' }
   ];
   
   $: currentPath = $page.url.pathname;
@@ -42,7 +43,7 @@
     
     {#if sidebarOpen}
       <div class="sidebar-footer">
-        <p class="version">v0.1.0-alpha</p>
+        <p class="version">v0.2.0-beta</p>
         <p class="status">● Backend Connected</p>
       </div>
     {/if}
