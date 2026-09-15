@@ -11,7 +11,7 @@
 ## 🎯 Overview
 
 DNA Platform enables bioinformaticians to:
-- **Build complex workflows**  DSL using a visual WYSIWYG tooling drag-and-drop designer
+- **Build complex workflows**  DSL using a visual WYSIWYG tooling drag-and-drop reusable commponet 
 - **Centralized polyglot runtime** one monolithic platform, automated dependency resolver 
 - **Compose reusable nodes** plug and play, validate scheme before running the workflow  
 - **annotate any library ** use plugin MCP servers or run locally via predefined serialization objects [logic_component]
