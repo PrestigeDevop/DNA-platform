@@ -11,13 +11,13 @@
 ## 🎯 Overview
 
 DNA Platform enables bioinformaticians to:
-- **Build complex workflows** without coding using a visual drag-and-drop designer
-- **Leverage AI agents** for intelligent analysis and decision-making
-- **Compose reusable skills** for bioinformatic algorithms
-- **Execute in parallel** for distributed processing
-- **Interoperate** with Python, R, Node.js through polyglot runtime
+- **Build complex workflows**  DSL using a visual WYSIWYG tooling drag-and-drop designer
+- **Centralized polyglot runtime** one monolithic platform, automated dependency resolver 
+- **Compose reusable nodes** plug and play, validate scheme before running the workflow  
+- **annotate any library ** use plugin MCP servers or run locally via predefined serialization objects [logic_component]
+- **Interoperate** with Python, R, Node.js, JVM or .net core all through polyglot platform ready to scale  
 
-**Built on**: .NET 8.0+ | **Philosophy**: FFI, IPC, and transpilation for cloud-native scalability
+**Built on**: .NET 8.0+ and Node LTS | **Philosophy**: integrate A2A , FFI, IPC, and FaaS for cloud-native scalability
 
 ## ✨ Key Features
 
@@ -36,10 +36,10 @@ DNA Platform enables bioinformaticians to:
 - **Subworkflow references** for composition
 
 ### 🤖 AI Agent Framework
-- **Microsoft Semantic Kernel** integration (planned)
+- **Microsoft Semantic Kernel with MARL** integration (planned)
 - **Local LLM inference** support (Ollama, LM Studio)
 - **Tool calling** for skill invocation
-- **Reasoning traces** for interpretability
+- **Reasoning traces** for interpretability (todo: unfied IO logs observability layer) 
 
 ### 🧩 Extensible Skill System
 - **Plugin architecture** for custom bioinformatic algorithms
@@ -51,12 +51,13 @@ DNA Platform enables bioinformaticians to:
 - **.NET polyglot kernel** for Jupyter notebooks
 - **Python interop** (pythonnet/PyO3)
 - **Node.js bridge** for JavaScript tools
-- **Rust FFI** for performance-critical code
+- **one Mise file** package and env reslover
 
 ### 💻 DevUI - Web-Based Designer
 - **Drag-and-drop workflow builder** (coming soon)
 - **REST API** for workflow management
 - **Real-time execution monitoring**
+- **Customizble**
 
 ## 🚀 Quick Start (DevUI Web App)
 
