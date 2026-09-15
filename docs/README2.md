@@ -237,26 +237,26 @@ ollama pull llama3.2        # General purpose (3B)
 - [x] Swagger/OpenAPI documentation
 - [x] In-memory workflow store
 
-### Phase 2: Local LLM Integration 🚧 In Progress
-- [x] Ollama agent implementation
-- [x] HTTP client for Ollama API
-- [ ] Streaming response support
-- [ ] Model selection per agent
-- [ ] Fallback when Ollama unavailable
-- [ ] Token usage tracking
+### Phase 2: DevUI API ✅ Complete
+- [x] SvelteKit frontend setup
+- [x] Prisma + SQLite persistence layer
+- [x] Workflow CRUD endpoints
+- [x] Agent CRUD endpoints
+- [x] Execution monitoring API
+- [x] Request logging (console + web Logs page)
 
-### Phase 3: DevUI Frontend 🚧 In Progress
-- [x] SvelteKit project setup
-- [x] Tailwind CSS configuration
-- [x] API client service
-- [ ] Node palette component
-- [ ] Workflow canvas with drag-and-drop
-- [ ] Connection drawing (SVG)
-- [ ] Properties panel
-- [ ] Dashboard page
-- [ ] Execution monitor page
-- [ ] Agent management page
-- [ ] Skills browser page
+### Phase 3: Web Designer + Custom Skills ✅ Complete
+- [x] Custom skills framework (`DNAPlatform.Skills`)
+- [x] Built-in + bioinformatics skills
+- [x] GUI-triggered skill execution
+- [x] Skill “Details” parameter editor
+- [x] Custom snippet model + snippet CRUD
+- [x] Snippet execute endpoint (hello-world .NET handler)
+- [x] “Create Custom Snippet” dialog on `/skills`
+- [x] Drag-and-drop designer integrated into `/workflows`
+- [x] Designer IO ports from snippet/node metadata
+- [x] Click node → inline inspect/edit panel
+- [x] Connected services status panel
 
 ### Phase 4: Advanced Features 📋 Planned
 - [ ] WebSocket real-time updates

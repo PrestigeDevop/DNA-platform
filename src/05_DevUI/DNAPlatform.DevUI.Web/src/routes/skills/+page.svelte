@@ -1,7 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import MsgBoxDemo from '$lib/components/MsgBoxDemo.svelte';
-  import MsgBoxResult from '$lib/components/MsgBoxResult.svelte';
+  import { api } from '$lib/services/api';
 
   interface SkillInputField {
     name: string;
@@ -24,12 +22,236 @@
     inputFields?: SkillInputField[];
   }
 
+  interface SnippetIOField {
+    name: string;
+    label?: string;
+    type?: string;
+    required?: boolean;
+    defaultValue?: any;
+    options?: string[];
+    placeholder?: string;
+  }
+
   let skills: Skill[] = [];
+  let snippets: any[] = [];
   let loading = true;
   let error = '';
   let selectedSkill: Skill | null = null;
   let executionResult: any = null;
   let paramEdit: Record<string, any> = {};
+
+  let showSnippetDialog = false;
+  let snippetForm = {
+    name: '',
+    description: '',
+    runtime: 'PolyglotKernel',
+    inputs: [] as SnippetIOField[],
+    outputs: [] as SnippetIOField[],
+    action: { kind: 'dotnet-hello-world' }
+  };
+  let testingSnippetResult: any = null;
+
+  onMount(async () => {
+    await loadSkills();
+    await loadSnippets();
+  });
+
+  async function loadSkills() {
+    try {
+      loading = true;
+      error = '';
+
+      const res = await fetch('/api/skills');
+
+      if (!res.ok) {
+        throw new Error(`Failed to load skills: ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      skills = (data.Skills || data.skills || []).map((s: any) => ({
+        skillId: s.SkillId || s.skillId || '',
+        name: s.Name || s.name || '',
+        description: s.Description || s.description || '',
+        category: s.Category || s.category || '',
+        icon: s.Icon || s.icon || '',
+        inputSchema: s.InputSchema || s.inputSchema || {},
+        inputFields: s.InputFields || s.inputFields || []
+      }));
+    } catch (err) {
+      console.error(err);
+      error = 'Failed to load skills';
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function loadSnippets() {
+    try {
+      const data = await api.getSnippets();
+      snippets = data || [];
+    } catch (err) {
+      console.error(err);
+      snippets = [];
+    }
+  }
+
+  async function executeSkill(
+    skillId: string,
+    inputs: Record<string, any> = {}
+  ) {
+    try {
+      const res = await fetch(`/api/skills/${skillId}/execute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(inputs)
+      });
+
+      const result = await res.json();
+
+      if (result.success) {
+        executionResult = result;
+      } else {
+        alert(
+          `Skill execution failed: ${
+            result.error || result.message || 'Unknown error'
+          }`
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Skill execution failed: Network or server error');
+    }
+  }
+
+  function viewDetails(skill: Skill) {
+    selectedSkill = skill;
+    paramEdit = {};
+
+    if (skill.inputFields?.length) {
+      for (const field of skill.inputFields) {
+        if (field.defaultValue !== undefined) {
+          paramEdit[field.name] = field.defaultValue;
+        } else if (field.type === 'bool') {
+          paramEdit[field.name] = false;
+        } else {
+          paramEdit[field.name] = '';
+        }
+      }
+    } else {
+      for (const [key] of Object.entries(skill.inputSchema)) {
+        paramEdit[key] = '';
+      }
+    }
+  }
+
+  function closeDetails() {
+    selectedSkill = null;
+    paramEdit = {};
+  }
+
+  function closeResult() {
+    executionResult = null;
+  }
+
+  async function executeFromDetails() {
+    if (!selectedSkill) return;
+
+    await executeSkill(selectedSkill.skillId, paramEdit);
+  }
+
+  function updateParam(name: string, value: any) {
+    paramEdit[name] = value;
+  }
+
+  async function testSnippet() {
+    if (!snippetForm.name) {
+      alert('Please enter a snippet name.');
+      return;
+    }
+
+    try {
+      const created = await api.createSnippet({
+        name: snippetForm.name,
+        description: snippetForm.description,
+        runtime: snippetForm.runtime,
+        inputs: snippetForm.inputs,
+        outputs: snippetForm.outputs,
+        action: snippetForm.action
+      });
+
+      const snippetId = created.snippet?.id ?? created?.snippet?.id;
+      if (!snippetId) {
+        alert('Failed to create snippet.');
+        return;
+      }
+
+      const inputs: Record<string, any> = {};
+      for (const field of snippetForm.inputs) {
+        if (field.defaultValue !== undefined) {
+          inputs[field.name] = field.defaultValue;
+        } else if (field.type === 'bool') {
+          inputs[field.name] = false;
+        } else {
+          inputs[field.name] = field.name || '';
+        }
+      }
+
+      const execResult = await api.executeSnippet(snippetId, inputs);
+      testingSnippetResult = execResult;
+    } catch (err) {
+      console.error(err);
+      alert('Snippet test failed.');
+    }
+  }
+
+  async function saveSnippet() {
+    if (!snippetForm.name) {
+      alert('Please enter a snippet name.');
+      return;
+    }
+
+    try {
+      await api.createSnippet({
+        name: snippetForm.name,
+        description: snippetForm.description,
+        runtime: snippetForm.runtime,
+        inputs: snippetForm.inputs,
+        outputs: snippetForm.outputs,
+        action: snippetForm.action
+      });
+
+      showSnippetDialog = false;
+      snippetForm = {
+        name: '',
+        description: '',
+        runtime: 'PolyglotKernel',
+        inputs: [],
+        outputs: [],
+        action: { kind: 'dotnet-hello-world' }
+      };
+
+      await loadSnippets();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save snippet.');
+    }
+  }
+
+  function closeSnippetDialog() {
+    showSnippetDialog = false;
+    snippetForm = {
+      name: '',
+      description: '',
+      runtime: 'PolyglotKernel',
+      inputs: [],
+      outputs: [],
+      action: { kind: 'dotnet-hello-world' }
+    };
+    testingSnippetResult = null;
+  }
 
   onMount(async () => {
     await loadSkills();

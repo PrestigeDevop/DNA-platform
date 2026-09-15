@@ -191,50 +191,56 @@ var sp = services.BuildServiceProvider();
 
 ## Writing Custom Skills
 
-```csharp
-public class MySkill : ISkill
+### Custom Skill Snippet (hello-world .NET example)
+
+For the polyglot kernel / custom snippet flow, you can create a snippet that the backend executes as a .NET endpoint and that becomes a designer node with editable IO.
+
+**Example snippet payload (JSON):**
+```json
 {
-    public string SkillId => "my-skill";
-    public string Name => "My Custom Skill";
-    public string Description => "Does something useful";
-
-    public async Task<SkillOutput> Execute(Dictionary<string, object>? inputs = null)
-    {
-        try 
-        {
-            // Do work here
-            
-            return new SkillOutput
-            {
-                Success = true,
-                Data = new Dictionary<string, object> { { "result", "value" } }
-            };
-        }
-        catch (Exception ex)
-        {
-            return new SkillOutput
-            {
-                Success = false,
-                ErrorMessage = ex.Message
-            };
-        }
-    }
-
-    public Dictionary<string, string>? GetInputSchema()
-    {
-        return new Dictionary<string, string> { { "input", "string" } };
-    }
-
-    public Dictionary<string, string>? GetOutputSchema()
-    {
-        return new Dictionary<string, string> { { "result", "string" } };
-    }
+  "name": "Hello World .NET",
+  "runtime": "PolyglotKernel",
+  "description": "Echoes a string to the backend console and returns a JSON result",
+  "inputs": [
+    { "name": "name", "label": "Name", "type": "string", "required": true, "defaultValue": "World" }
+  ],
+  "outputs": [
+    { "name": "result", "label": "Result", "type": "string" }
+  ],
+  "action": { "kind": "dotnet-hello-world" }
 }
-
-// Register skill
-var registry = sp.GetRequiredService<ISkillRegistry>();
-await registry.RegisterSkill("my-skill", new MySkill());
 ```
+
+**Backend execution behavior (hello-world):**
+- Input: `name` (string)
+- Console: `Console.WriteLine($"Hello {name} from .NET (polyglot kernel placeholder)")`
+- Output: `{ "result": "Hello {name} from .NET (polyglot kernel placeholder)", "timestamp": "..." }`
+
+**Create snippet (SvelteKit server route):**
+```bash
+curl -X POST http://localhost:5173/api/snippets \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "Hello World .NET", "runtime": "PolyglotKernel", "inputs": [{"name":"name","label":"Name","type":"string","required":true}], "outputs": [{"name":"result","label":"Result","type":"string"}], "action": {"kind":"dotnet-hello-world"} }'
+```
+
+**Execute snippet (hello-world):**
+```bash
+curl -X POST http://localhost:5254/api/snippets/{snippetId}/execute \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "DNA Platform" }'
+```
+
+### Drag a Custom Snippet Node into the Designer
+
+Once a custom snippet is created, it appears in the palette on the `/workflows` designer page. Dragging it onto the canvas creates a node whose IO ports come from the snippet’s `inputs` and `outputs`.
+
+**Example:**
+- Snippet “Hello World .NET” has input `name` (string) and output `result` (string)
+- Drag it onto the canvas
+- Click the node → inspect/edit panel shows `name` (editable) and `result` (output)
+- When the workflow runs, the node executes the backend snippet endpoint with the node’s inputs
+
+> **Note:** The snippet metadata (name, inputs, outputs, runtime, action) is static at registration time. The node data you edit in the canvas is the per-instance data used when the workflow executes the snippet.
 
 ## Node Types Reference
 

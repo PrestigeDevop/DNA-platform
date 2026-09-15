@@ -134,13 +134,27 @@ src/06_Skills/
 
 ## Next Steps
 
+Phase 3 status: **Complete** (with remaining items below).
+
+Currently complete:
+- Custom skills framework (`DNAPlatform.Skills`)
+- Built-in + bioinformatics skills
+- GUI-triggered skill execution
+- Skill “Details” parameter editor
+- Custom snippet model + snippet CRUD
+- Snippet execute endpoint (hello-world .NET handler)
+- “Create Custom Snippet” dialog on `/skills`
+- Drag-and-drop designer integrated into `/workflows`
+- Designer IO ports from snippet/node metadata
+- Click node → inline inspect/edit panel
+- Connected services status panel
+
 Phase 3 remaining tasks:
-- [ ] Workflow designer canvas (drag-and-drop)
-- [ ] User-defined node button
-- [ ] Import/export JSON with runtime environment
-- [ ] Reusable components panel
-- [ ] Editable agents (settings, skills)
-- [ ] Local inference endpoints
+- [ ] Full connection drawing (source port → target port → SVG edge)
+- [ ] Workflow execution inside the canvas
+- [ ] Export/import workflow JSON with runtime environment metadata
+- [ ] Agent-backed nodes in workflows
+- [ ] Real custom code execution path for polyglot kernel snippets (hello-world placeholder is live)
 
 ## License
 

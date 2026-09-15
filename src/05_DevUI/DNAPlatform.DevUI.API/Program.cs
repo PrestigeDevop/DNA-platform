@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using DNAPlatform.Skills;
@@ -115,11 +116,76 @@ app.MapGet("/api/info", () => new
         Executions = "/api/executions",
         Agents = "/api/agents",
         Skills = "/api/skills",
+        Snippets = "/api/snippets",
         Logs = "/api/logs",
         NodeTypes = "/api/node-types",
         StatusValues = "/api/status-values",
         Health = "/health"
     }
+});
+
+// Snippet execution endpoint (hello-world .NET handler + future polyglot runtime placeholder)
+app.MapPost("/api/snippets/{id}/execute", (string id, [FromBody] Dictionary<string, object>? inputs, ILogger<Program> logger) =>
+{
+    // NOTE: real snippet persistence/metadata lookup will happen via the Prisma-backed
+    // /api/snippets CRUD route on the frontend side. Here we implement the concrete
+    // hello-world .NET handler and leave an obvious extension point for other runtimes.
+    var action = new Dictionary<string, object>();
+    try
+    {
+        // If callers pass an explicit action payload, prefer it; otherwise treat this
+        // as the hello-world handler.
+        if (inputs != null && inputs.TryGetValue("action", out var a) && a != null)
+            action = a as Dictionary<string, object> ?? new Dictionary<string, object>();
+    }
+    catch
+    {
+        action = new Dictionary<string, object>();
+    }
+
+    var kind = action.TryGetValue("kind", out var k) && k != null
+        ? k.ToString()
+        : (action.TryGetValue("kind", out var _2) ? "dotnet-hello-world" : "dotnet-hello-world");
+
+    if (string.Equals(kind, "dotnet-hello-world", StringComparison.OrdinalIgnoreCase))
+    {
+        // hello-world: take first input string, console write it, return JSON.
+        string inputText = "World";
+        foreach (var (key, value) in inputs ?? new Dictionary<string, object>())
+        {
+            if (value is string s && !string.IsNullOrWhiteSpace(s))
+            {
+                inputText = s;
+                break;
+            }
+            if (value != null)
+            {
+                inputText = value.ToString() ?? "World";
+                break;
+            }
+        }
+
+        logger.LogInformation("Snippet '{Id}' hello-world executing with input: {Input}", id, inputText);
+        Console.WriteLine($"[Snippet {id}] Hello {inputText} from .NET (polyglot kernel placeholder)");
+
+        return Results.Ok(new
+        {
+            Success = true,
+            SnippetId = id,
+            Data = new Dictionary<string, object>
+            {
+                { "result", $"Hello {inputText} from .NET (polyglot kernel placeholder)" },
+                { "timestamp", DateTime.UtcNow.ToString("O") }
+            },
+            ExecutedAt = DateTime.UtcNow
+        });
+    }
+
+    return Results.BadRequest(new
+    {
+        Success = false,
+        Error = $"Runtime/action not implemented yet: {kind}. Only 'dotnet-hello-world' is supported for now."
+    });
 });
 
 // -------- Log endpoints --------

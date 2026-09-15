@@ -206,45 +206,84 @@ All docs live in **[docs/](./docs/)**:
 
 ## 🛣️ Roadmap
 
-### Phase 1: Foundation ✅ 
+### Phase 1: Foundation ✅ COMPLETE
 - [x] Core workflow orchestration engine
-- [x] Node execution framework
+- [x] Node execution framework with topological DAG
 - [x] Agent manager & skill registry
 - [x] Console demo with 3 patterns
-- [ ] Unit tests
+- [x] ASP.NET Core REST API + Swagger
 
-### Phase 2: DevUI (September)
-- [ ] ASP.NET Core REST API
-- [ ] Workflow CRUD endpoints
-- [ ] Execution monitoring API
-- [ ] WebSocket real-time updates
+### Phase 2: DevUI API ✅ COMPLETE
+- [x] SvelteKit frontend (port 5173) + Prisma/SQLite persistence
+- [x] ASP.NET Core REST API (port 5254)
+- [x] Workflow CRUD + agent CRUD + execution list
+- [x] Workflow execute → record result in SQLite
+- [x] Request logging (console + web Logs page)
 
-### Phase 3: Web Designer (October)
-- [ ] React workflow designer
-- [ ] Drag-and-drop node composition
-- [ ] Workflow templates library
-- [ ] Execution visualization
+### Phase 3: Web Designer + Custom Skills ✅ COMPLETE
+- [x] Custom skills framework (`DNAPlatform.Skills`)
+- [x] Built-in + bioinformatics skills
+- [x] GUI-triggered skill execution (`/api/skills/{id}/execute`)
+- [x] Skill “Details” parameter editor (typed input fields)
+- [x] Custom snippet model (`CustomSnippet`) + CRUD (`/api/snippets`)
+- [x] Snippet execute endpoint with hello-world .NET handler
+- [x] “Create Custom Snippet” dialog on `/skills` (runtime selector, IO editors, test, save to palette)
+- [x] Drag-and-drop designer integrated into `/workflows`
+- [x] Designer IO ports from snippet/node metadata
+- [x] Click node → inline inspect/edit panel
+- [x] Connected services status panel (backend, polyglot kernel, placeholder external MCP/local executor)
 
-### Phase 4: AI Integration (November)
-- [ ] Microsoft Semantic Kernel
-- [ ] Local LLM support (Ollama)
-- [ ] Function calling
-- [ ] Agent tool binding
+### Phase 4: AI Integration 📋 Planned (November)
+- [ ] Microsoft Semantic Kernel integration for agent reasoning
+- [ ] Local LLM support (Ollama, LM Studio) with model switching
+- [ ] Function calling / tool use patterns
+- [ ] Agent reasoning traces display
+- [ ] Prompt templating and versioning
+- [ ] Token usage tracking per execution
 
-### Phase 5: Bioinformatics (December)
-- [ ] Sequence alignment skills
-- [ ] Molecular docking
-- [ ] Statistical analysis
-- [ ] Visualization components
+### Phase 5: Bioinformatics 📋 Planned (December)
+- [ ] Sequence alignment skills (BLAST, Needleman-Wunsch, Smith-Waterman)
+- [ ] FASTA/FASTQ file loading and parsing
+- [ ] Molecular docking simulations
+- [ ] Statistical analysis nodes
+- [ ] Visualization components (D3.js, Plotly integration)
+- [ ] Database integration (UniProt, NCBI E-utilities)
+
+### Phase 6: Production 📋 Planned (Q1 2027)
+- [ ] PostgreSQL persistence (replace SQLite with production DB)
+- [ ] Redis caching for workflow states and agent contexts
+- [ ] Docker containerization for all services
+- [ ] Kubernetes deployment manifests
+- [ ] CI/CD pipeline (GitHub Actions)
+- [ ] User authentication (JWT/OAuth integration)
+- [ ] Multi-user collaboration features
+- [ ] Comprehensive audit logging
+- [ ] Performance monitoring & alerting
 
 ## 🧪 Current Status
 
-**v0.1.0-alpha**: Fully functional workflow engine with:
-- ✅ Topological DAG execution
-- ✅ Parallel node processing
-- ✅ Error handling & retry logic
-- ✅ Extensible architecture
-- ✅ Working console demo
+**v0.2.0-beta**: Core engine + DevUI API complete, web designer + custom skills complete
+
+### Achieved ✅
+- ✅ Topological DAG execution with parallel processing
+- ✅ Parallel node processing via Task.WhenAll
+- ✅ Error handling & retry logic with exponential backoff
+- ✅ Extensible architecture (ISkill, IAgent interfaces)
+- ✅ Working console demo with 3 workflow patterns
+- ✅ **REST API fully functional** (workflows, agents, executions, skills, logs)
+- ✅ **Prisma + SQLite persistence** for audit trail
+- ✅ **SvelteKit reactive frontend** (CRUD via server routes)
+- ✅ **Custom skills system** (backend + GUI execution)
+- ✅ **Custom snippet model** + hello-world .NET snippet endpoint
+- ✅ **Drag-and-drop designer** integrated into `/workflows`
+- ✅ **Connected services panel** (backend + polyglot kernel + placeholder external MCP/local executor)
+
+### In Development 🚧
+- 🚧 Full connection drawing in the designer (click source → target port → SVG edge)
+- 🚧 Workflow execution inside the canvas (run nodes in connected order, progress per node)
+- 🚧 Export/import workflow JSON with runtime environment metadata
+- 🚧 Agent-backed nodes in workflows
+- 🚧 Real custom code execution path for polyglot kernel snippets (hello-world placeholder is live)
 
 ## 💡 Quick Example
 

@@ -41,6 +41,40 @@ export const api = {
     });
   },
 
+  // --- Snippets (SvelteKit server-backed CRUD + backend execute) ---
+  async getSnippets() {
+    const data = await request<ApiResponse<any[]>>("/api/snippets");
+    return data.snippets || [];
+  },
+
+  async createSnippet(snippet: any) {
+    return request<any>("/api/snippets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(snippet)
+    });
+  },
+
+  async updateSnippet(id: string, snippet: any) {
+    return request<any>(`/api/snippets/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(snippet)
+    });
+  },
+
+  async deleteSnippet(id: string) {
+    return request<any>(`/api/snippets/${id}`, { method: "DELETE" });
+  },
+
+  async executeSnippet(id: string, inputs?: Record<string, any>) {
+    return request<any>(`/api/snippets/${id}/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(inputs || {})
+    });
+  },
+
   // --- Node Types & Status Values (proxied to .NET backend) ---
   async getNodeTypes() {
     return request<any>("/api/node-types");

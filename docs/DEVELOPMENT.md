@@ -350,28 +350,49 @@ Add `.vscode/launch.json`:
 ## Next Development Tasks
 
 ### Phase 1: Complete Core Framework
-- [ ] Add circular dependency detection
-- [ ] Implement conditional branching logic
-- [ ] Add loop handling
-- [ ] Write comprehensive unit tests
+- [x] Topological DAG execution
+- [x] Parallel node processing
+- [x] Error handling and retry logic
+- [x] Skill registry and custom skills framework
+- [ ] Unit tests
 
-### Phase 2: Microsoft Agents Integration
-- [ ] Integrate Microsoft Semantic Kernel
-- [ ] Setup tool calling framework
-- [ ] Implement ReAct pattern
-- [ ] Add function calling support
+### Phase 2: DevUI API
+- [x] ASP.NET Core REST API
+- [x] Workflow CRUD endpoints
+- [x] Agent CRUD endpoints
+- [x] Execution monitoring API
+- [x] Web Logs page (backend + captured frontend logs)
 
-### Phase 3: DevUI Backend
-- [ ] Create ASP.NET Core API
-- [ ] Implement workflow CRUD endpoints
-- [ ] Add execution monitoring API
-- [ ] Setup WebSocket for real-time updates
+### Phase 3: Web Designer + Custom Skills
+- [x] Custom skills framework (`DNAPlatform.Skills`)
+- [x] Built-in + bioinformatics skills
+- [x] GUI-triggered skill execution
+- [x] Skill “Details” parameter editor (typed input fields)
+- [x] Custom snippet model + snippet CRUD (`/api/snippets`)
+- [x] Snippet execute endpoint (hello-world .NET handler)
+- [x] “Create Custom Snippet” dialog on `/skills`
+- [x] Drag-and-drop designer integrated into `/workflows`
+- [x] Designer IO ports from snippet/node metadata
+- [x] Click node → inline inspect/edit panel
+- [x] Connected services status panel
+- [ ] Full connection drawing (source → target port → SVG edge)
+- [ ] Workflow execution inside the canvas
+- [ ] Export/import workflow JSON with runtime environment metadata
 
-### Phase 4: Frontend
-- [ ] React workflow designer
-- [ ] Node palette UI
-- [ ] Connection editor
-- [ ] Execution viewer
+### Phase 4: AI Integration
+- [ ] Microsoft Semantic Kernel integration
+- [ ] Local LLM support (Ollama, LM Studio)
+- [ ] Function calling / tool use
+- [ ] Agent reasoning traces
+- [ ] Prompt templating and versioning
+
+### Phase 5: Bioinformatics
+- [ ] Sequence alignment skills
+- [ ] FASTA/FASTQ file handling
+- [ ] BLAST integration
+- [ ] Statistical analysis nodes
+- [ ] Visualization components
+- [ ] R/Python script execution
 
 ## Common Issues & Solutions
 

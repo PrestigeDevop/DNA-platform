@@ -1,6 +1,6 @@
 # Phase 3 Implementation Progress
 
-> Last updated: 2026-09-06
+> Last updated: 2026-09-15
 
 ## ✅ Completed
 
@@ -22,6 +22,34 @@
 - ✅ `SequenceAlignerSkill.cs` - Needleman-Wunsch global alignment
 
 ### 2. GUI-Triggered Execution (Frontend)
+
+- ✅ Skills page with parameter editor (typed input fields)
+- ✅ “Details” button renders editable params for each skill
+- ✅ MsgBox demo button triggers backend skill execution
+
+### 3. Custom Snippet Model
+
+- ✅ `CustomSnippet` model (Prisma)
+- ✅ Snippet CRUD (`/api/snippets`)
+- ✅ Snippet execute endpoint (`/api/snippets/{id}/execute`)
+- ✅ Hello-world .NET handler (console write + JSON return)
+- ✅ “Create Custom Snippet” dialog on `/skills` (runtime selector, IO editors, test, save to palette)
+
+### 4. Web Designer
+
+- ✅ Drag-and-drop designer integrated into `/workflows`
+- ✅ Designer IO ports from snippet/node metadata
+- ✅ Click node → inline inspect/edit panel
+- ✅ Connected services status panel (backend, polyglot kernel, placeholder external MCP/local executor)
+
+## ⏳ Next Steps (Phase 3 Remaining)
+
+- [ ] Full connection drawing (source port → target port → SVG edge)
+- [ ] Workflow execution inside the canvas (run nodes in connected order)
+- [ ] Export/import workflow JSON with runtime environment metadata
+- [ ] Agent-backed nodes in workflows
+- [ ] Real custom code execution path for polyglot kernel snippets (hello-world placeholder is live)
+- [ ] External MCP / local executor integration (wiring, not UI)
 
 **Components Created:**
 - ✅ `MsgBoxDemo.svelte` - Interactive demo with input fields

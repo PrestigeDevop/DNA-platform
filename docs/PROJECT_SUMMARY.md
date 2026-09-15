@@ -44,6 +44,38 @@
 - ✅ Logging integration
 - ✅ Error handling
 
+### ✅ Completed (Phase 2: DevUI API)
+
+**Web Frontend + Backend**
+- ✅ SvelteKit frontend (port 5173) + Prisma/SQLite persistence
+- ✅ ASP.NET Core REST API (port 5254) + Swagger
+- ✅ Workflow CRUD endpoints
+- ✅ Agent CRUD endpoints
+- ✅ Execution monitoring API
+- ✅ Request logging (console + web Logs page)
+- ✅ Health check and proxy configuration
+
+### ✅ Completed (Phase 3: Web Designer + Custom Skills)
+
+**Custom Skills System**
+- ✅ Custom skills framework (`DNAPlatform.Skills`)
+- ✅ Built-in skills: MsgBoxAlertSkill, DataTransformSkill, ValidationSkill, MergeResultsSkill
+- ✅ Bioinformatics skills: FastaLoaderSkill, SequenceAlignerSkill
+- ✅ GUI-triggered skill execution (`/api/skills/{id}/execute`)
+- ✅ Skill “Details” parameter editor (typed input fields)
+
+**Custom Snippet Model**
+- ✅ `CustomSnippet` model (Prisma)
+- ✅ Snippet CRUD (`/api/snippets`)
+- ✅ Snippet execute endpoint with hello-world .NET handler
+- ✅ “Create Custom Snippet” dialog on `/skills` (runtime selector, IO editors, test, save to palette)
+
+**Web Designer**
+- ✅ Drag-and-drop designer integrated into `/workflows`
+- ✅ Designer IO ports from snippet/node metadata (inputs on left, outputs on right)
+- ✅ Click node → inline inspect/edit panel (metadata static, node data editable)
+- ✅ Connected services status panel (backend, polyglot kernel, placeholder external MCP/local executor)
+
 ### 📚 Documentation (3 Comprehensive Guides)
 
 1. **ARCHITECTURE.md** (250 lines)

@@ -47,3 +47,15 @@ model Execution {
 
   @@index([workflowId])
 }
+
+model CustomSnippet {
+  id          String   @id @default(cuid())
+  name        String
+  runtime     String   @default("PolyglotKernel")
+  description String?
+  inputs      String   // JSON string: CustomSnippetIO[]
+  outputs     String   // JSON string: CustomSnippetIO[]
+  action      String   // JSON string: snippet action payload (e.g. { kind: "dotnet-hello-world" })
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
