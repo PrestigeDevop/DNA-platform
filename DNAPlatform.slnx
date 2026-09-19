@@ -1,0 +1,25 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/01_Core/" />
+  <Folder Name="/src/01_Core/DNAPlatform.Core/">
+    <Project Path="src/01_Core/DNAPlatform.Core/DNAPlatform.Core/DNAPlatform.Core.csproj" />
+  </Folder>
+  <Folder Name="/src/03_AgentWorkflowPatterns/">
+    <Project Path="src/03_AgentWorkflowPatterns/DNAPlatform.AgentWorkflowPatterns.ConsoleApp/DNAPlatform.AgentWorkflowPatterns.ConsoleApp.csproj" />
+  </Folder>
+  <Folder Name="/src/03_AgentWorkflowPatterns/DNAPlatform.AgentFramework/">
+    <Project Path="src/03_AgentWorkflowPatterns/DNAPlatform.AgentFramework/DNAPlatform.AgentFramework/DNAPlatform.AgentFramework.csproj" />
+  </Folder>
+  <Folder Name="/src/04_WorkflowEngine/" />
+  <Folder Name="/src/04_WorkflowEngine/DNAPlatform.Workflow/">
+    <Project Path="src/04_WorkflowEngine/DNAPlatform.Workflow/DNAPlatform.Workflow/DNAPlatform.Workflow.csproj" />
+  </Folder>
+  <Folder Name="/src/05_DevUI/" />
+  <Folder Name="/src/05_DevUI/DNAPlatform.DevUI.API/">
+    <Project Path="src/05_DevUI/DNAPlatform.DevUI.API/DNAPlatform.DevUI.API/DNAPlatform.DevUI.API.csproj" />
+  </Folder>
+  <Folder Name="/src/06_Skills/" />
+  <Folder Name="/src/06_Skills/DNAPlatform.Skills.Core/">
+    <Project Path="src/06_Skills/DNAPlatform.Skills.Core/DNAPlatform.Skills.Core/DNAPlatform.Skills.Core.csproj" />
+  </Folder>
+</Solution>
