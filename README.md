@@ -53,7 +53,7 @@ DNA Platform enables bioinformaticians to:
 - **Python interop** (pythonnet/PyO3)
 - **Node.js bridge** for JavaScript tools
 - **one Mise file** package and env reslover (the core idea)
-- **pack drylab experiments** make abstract interactive webapps sort of  like hugging face's playground locally for now
+- **pack drylab experiments** make abstract interactive webapps sort of  like hugging face's playground locally for now maybe "Distroless docker image"
 
 
 ### 💻 DevUI - Web-Based Designer
