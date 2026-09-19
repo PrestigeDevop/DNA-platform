@@ -44,14 +44,17 @@ DNA Platform enables bioinformaticians to:
 ### 🧩 Extensible Skill System
 - **Plugin architecture** for custom bioinformatic algorithms
 - **Built-in skills**: Data transform, Validation, Merge results
-- **Dynamic skill discovery** and registration
+- **Dynamic skill discovery** and registration (WIP)
+- - **Modular ** Modular  BCL and FCL scaffold any prewritten class into Boilerplate Code (stubs) 
 - **Input/output schema** validation
 
 ### 🌐 Polyglot Runtime
 - **.NET polyglot kernel** for Jupyter notebooks
 - **Python interop** (pythonnet/PyO3)
 - **Node.js bridge** for JavaScript tools
-- **one Mise file** package and env reslover
+- **one Mise file** package and env reslover (the core idea)
+- **pack drylab experiments** make abstract interactive webapps sort of  like hugging face's playground locally for now
+
 
 ### 💻 DevUI - Web-Based Designer
 - **Drag-and-drop workflow builder** (coming soon)
