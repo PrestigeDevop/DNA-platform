@@ -1,0 +1,1 @@
+@tailwind base;@tailwind components;@tailwind utilities;:root { --primary: #0ea5e9; --bg-dark: #0f172a; --bg-card: #1e293b; --border: #334155; }body { background: var(--bg-dark); color: #e2e8f0; font-family: Segoe UI, sans-serif; }
