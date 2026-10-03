@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { api } from '$lib/services/api';
+  import MsgBoxDemo from '$lib/components/MsgBoxDemo.svelte';
+  import MsgBoxResult from '$lib/components/MsgBoxResult.svelte';
 
   interface SkillInputField {
     name: string;
@@ -160,6 +163,7 @@
     if (!selectedSkill) return;
 
     await executeSkill(selectedSkill.skillId, paramEdit);
+    closeDetails();
   }
 
   function updateParam(name: string, value: any) {
@@ -253,106 +257,6 @@
     testingSnippetResult = null;
   }
 
-  onMount(async () => {
-    await loadSkills();
-  });
-
-  async function loadSkills() {
-    try {
-      loading = true;
-      error = '';
-
-      const res = await fetch('/api/skills');
-
-      if (!res.ok) {
-        throw new Error(`Failed to load skills: ${res.status}`);
-      }
-
-      const data = await res.json();
-
-      skills = (data.Skills || data.skills || []).map((s: any) => ({
-        skillId: s.SkillId || s.skillId || '',
-        name: s.Name || s.name || '',
-        description: s.Description || s.description || '',
-        category: s.Category || s.category || '',
-        icon: s.Icon || s.icon || '',
-        inputSchema: s.InputSchema || s.inputSchema || {},
-        inputFields: s.InputFields || s.inputFields || []
-      }));
-    } catch (err) {
-      console.error(err);
-      error = 'Failed to load skills';
-    } finally {
-      loading = false;
-    }
-  }
-
-  async function executeSkill(
-    skillId: string,
-    inputs: Record<string, any> = {}
-  ) {
-    try {
-      const res = await fetch(`/api/skills/${skillId}/execute`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(inputs)
-      });
-
-      const result = await res.json();
-
-      if (result.success) {
-        executionResult = result;
-      } else {
-        alert(
-          `Skill execution failed: ${
-            result.error || result.message || 'Unknown error'
-          }`
-        );
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Skill execution failed: Network or server error');
-    }
-  }
-
-  function viewDetails(skill: Skill) {
-    selectedSkill = skill;
-    paramEdit = {};
-
-    if (skill.inputFields?.length) {
-      for (const field of skill.inputFields) {
-        if (field.defaultValue !== undefined) {
-          paramEdit[field.name] = field.defaultValue;
-        } else if (field.type === 'bool') {
-          paramEdit[field.name] = false;
-        } else {
-          paramEdit[field.name] = '';
-        }
-      }
-    } else {
-      for (const [key] of Object.entries(skill.inputSchema)) {
-        paramEdit[key] = '';
-      }
-    }
-  }
-
-  function closeDetails() {
-    selectedSkill = null;
-    paramEdit = {};
-  }
-
-  function closeResult() {
-    executionResult = null;
-  }
-
-  async function executeFromDetails() {
-    if (!selectedSkill) return;
-
-    await executeSkill(selectedSkill.skillId, paramEdit);
-    closeDetails();
-  }
 </script>
 
 <div class="skills-page">

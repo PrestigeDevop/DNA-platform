@@ -57,7 +57,9 @@ DNA Platform enables bioinformaticians to:
 
 
 ### 💻 DevUI - Web-Based Designer
-- **Drag-and-drop workflow builder** (coming soon)
+- **Drag-and-drop workflow builder** for composing nodes on a canvas
+- **Workflow persistence** via Prisma/SQLite (SvelteKit server routes)
+- **Backend execution** proxied to the .NET orchestrator
 - **REST API** for workflow management
 - **Real-time execution monitoring**
 - **Customizble**

@@ -1,11 +1,22 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import WorkflowDesigner from '$lib/components/WorkflowDesigner.svelte';
   
   let workflows: any[] = [];
   let loading = true;
   let error = '';
   let showCreateModal = false;
   let newWorkflow = { name: '', description: '' };
+  let editingWorkflow: any = null;
+
+  function openDesigner(workflow: any) {
+    editingWorkflow = workflow;
+  }
+
+  function closeDesigner() {
+    editingWorkflow = null;
+    loadWorkflows();
+  }
   
   onMount(async () => {
     await loadWorkflows();
@@ -92,6 +103,7 @@
           </div>
           <p class="workflow-desc">{workflow.description || 'No description'}</p>
           <div class="workflow-actions">
+            <button class="btn-small" on:click={() => openDesigner(workflow)}>✏️ Edit</button>
             <button class="btn-small" on:click={() => executeWorkflow(workflow.id)}>▶ Execute</button>
             <button class="btn-small btn-danger" on:click={() => deleteWorkflow(workflow.id)}>🗑 Delete</button>
           </div>
@@ -119,6 +131,10 @@
       </div>
     </div>
   </div>
+{/if}
+
+{#if editingWorkflow}
+  <WorkflowDesigner workflow={editingWorkflow} on:close={closeDesigner} on:saved={loadWorkflows} />
 {/if}
 
 <style>

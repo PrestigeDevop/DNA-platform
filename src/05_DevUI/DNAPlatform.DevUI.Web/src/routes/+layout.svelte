@@ -1,8 +1,14 @@
 <script lang="ts">
   import '../app.css';
   import { page } from '$app/stores';
+  import { onMount } from 'svelte';
+  import { captureConsole } from '$lib/services/logs';
   
   let sidebarOpen = true;
+
+  onMount(() => {
+    captureConsole();
+  });
   
   const navItems = [
     { path: '/', label: 'Dashboard', icon: '📊' },

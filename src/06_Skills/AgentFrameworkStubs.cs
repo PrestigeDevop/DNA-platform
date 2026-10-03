@@ -20,7 +20,12 @@ namespace DNAPlatform.AgentFramework
     {
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
-        public int NodeType { get; set; }
+
+        // String rather than the NodeType enum so workflow definitions persisted
+        // by the frontend (nodeType: "Input", "Agent", ...) bind without a custom
+        // converter or numeric mapping.
+        public string NodeType { get; set; } = "ProcessingSkill";
+
         public Dictionary<string, object> Config { get; set; } = new();
     }
 

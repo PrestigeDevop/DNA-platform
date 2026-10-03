@@ -1,7 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/db';
-import { BACKEND_URL } from '$env/static/private';
 
 // GET /api/snippets — list all snippets
 export const GET: RequestHandler = async () => {
@@ -91,23 +90,3 @@ export const DELETE: RequestHandler = async ({ params }) => {
   }
 };
 
-// POST /api/snippets/{id}/execute — proxy snippet execution to the .NET backend
-export const POST_execute: RequestHandler = async ({ params, request }) => {
-  try {
-    const backend = BACKEND_URL || 'http://127.0.0.1:5254';
-    const inputs = await request.json().catch(() => ({}));
-    const res = await fetch(`${backend}/api/snippets/${params.id}/execute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(inputs),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      return json(err, { status: res.status });
-    }
-    return json(await res.json());
-  } catch (error) {
-    console.error('Error executing snippet:', error);
-    return json({ error: 'Failed to execute snippet' }, { status: 500 });
-  }
-};

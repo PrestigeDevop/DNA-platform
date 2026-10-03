@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Text.Json.Serialization;
+using DNAPlatform.AgentFramework;
 using DNAPlatform.Skills;
 using DNAPlatform.DevUI.API.Services;
 using DNAPlatform.DevUI.API.Controllers;
@@ -8,7 +10,14 @@ using DNAPlatform.DevUI.API.Controllers;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Workflow/node enums must bind from and serialize to strings so the
+        // SvelteKit client can send node types like "Input" and read statuses
+        // like "Completed" without numeric mapping.
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -50,10 +59,22 @@ builder.Services.AddSingleton<ILogStore>(logStore);
 builder.Logging.AddProvider(new LogStoreLoggerProvider(logStore));
 
 // Register skill system (Phase 3 - Custom Skills)
-builder.Services.AddSingleton<ISkillRegistry, SkillRegistry>();
+builder.Services.AddSingleton<DNAPlatform.Skills.ISkillRegistry, DNAPlatform.Skills.SkillRegistry>();
+
+// AgentsController binds skills through the lightweight AgentFramework contract,
+// which is separate from the Skills project's registry. Bridge the two so skill
+// binding works without duplicating the real registry.
+builder.Services.AddSingleton<DNAPlatform.AgentFramework.ISkillRegistry, SkillRegistryAdapter>();
 
 // Register in-memory workflow store
 builder.Services.AddSingleton<IWorkflowStore, InMemoryWorkflowStore>();
+
+// Register the in-memory agent framework used by the Workflows/Agents/Executions
+// controllers. Without these registrations every request to those controllers
+// fails with "Unable to resolve service for type ..." (HTTP 500).
+builder.Services.AddSingleton<INodeExecutor, InMemoryNodeExecutor>();
+builder.Services.AddSingleton<IWorkflowOrchestrator, InMemoryWorkflowOrchestrator>();
+builder.Services.AddSingleton<IAgentManager, InMemoryAgentManager>();
 
 var app = builder.Build();
 
@@ -101,6 +122,21 @@ app.MapGet("/api/status-values", () => new
 {
     WorkflowStatus = new[] { "Pending", "Running", "Paused", "Completed", "Failed", "Cancelled" },
     NodeStatus = new[] { "Pending", "Waiting", "Running", "Completed", "Failed", "Skipped" }
+});
+
+// Ad-hoc workflow execution - runs a workflow definition supplied in the request
+// body without persisting it first. Used by the designer (api.ts -> executeWorkflow)
+// and by the SvelteKit /api/workflows/{id}/execute route, which loads a stored
+// workflow from Prisma and forwards its definition here.
+app.MapPost("/api/workflows/execute", async (Workflow workflow, IWorkflowOrchestrator orchestrator) =>
+{
+    if (workflow is null || workflow.Nodes is null || !workflow.Nodes.Any())
+    {
+        return Results.BadRequest(new { Error = "Workflow must contain at least one node" });
+    }
+
+    var result = await orchestrator.ExecuteWorkflow(workflow);
+    return Results.Ok(result);
 });
 
 // API info endpoint (api.ts -> getInfo)
@@ -201,7 +237,7 @@ app.MapPost("/api/snippets/{id}/execute", (string id, [FromBody] Dictionary<stri
 app.MapGet("/", () => Results.Redirect("/swagger"));
 
 // -------- startup banner + skill registry dump --------
-var skillRegistry = app.Services.GetRequiredService<ISkillRegistry>();
+var skillRegistry = app.Services.GetRequiredService<DNAPlatform.Skills.ISkillRegistry>();
 var registeredSkills = (await skillRegistry.ListSkills()).ToList();
 var backendUrls = (Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? "http://localhost:5254")
     .Split(';', StringSplitOptions.RemoveEmptyEntries);

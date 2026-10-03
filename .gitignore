@@ -29,8 +29,8 @@ Thumbs.db
 .env
 .env.local
 
-# Logs
-logs/
+# Logs (runtime output only; keep source dirs named "logs" tracked)
+/logs/
 *.log
 
 # Node / SvelteKit
