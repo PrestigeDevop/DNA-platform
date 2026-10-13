@@ -1,0 +1,29 @@
+# mise (https://mise.jdx.dev) project configuration.
+#
+# Pinned versions here are the ONLY tool declarations the platform treats as
+# "platform-provided defaults": .NET 8 and Node.js LTS (docs/refactor.md section 4,
+# lines 154-159). Do not add extra embedded runtimes here unless they are
+# really embedded in the repository.
+#
+# After editing: run `mise install` then `mise tasks ls` to confirm.
+
+[tools]
+dotnet = "8"
+node = "lts"
+
+[env]
+# Keeps `dotnet` usable on Debian images that ship without ICU.
+DOTNET_SYSTEM_GLOBALIZATION_INVARIANT = "1"
+
+[tasks.build]
+description = "Build the .NET solution"
+run = "dotnet build DNAPlatform.sln"
+
+# Task names containing ':' must be quoted as TOML keys.
+[tasks."build:web"]
+description = "Install web deps and push the Prisma schema (needs DATABASE_URL in the web .env)"
+run = "npm --prefix src/05_DevUI/DNAPlatform.DevUI.Web install && npm --prefix src/05_DevUI/DNAPlatform.DevUI.Web run prisma:db:push"
+
+[tasks.dev]
+description = "Build the backend, then start the SvelteKit dev server on :5173"
+run = "dotnet build DNAPlatform.sln && npm --prefix src/05_DevUI/DNAPlatform.DevUI.Web run dev"

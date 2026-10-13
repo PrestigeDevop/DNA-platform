@@ -1,0 +1,84 @@
+/// <reference types="node" />
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Workflow {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  nodes       String?   // WorkflowNode[] serialized as JSON string (SQLite has no Json type)
+  connections String?   // NodeConnection[] serialized as JSON string
+  status      String    @default("Draft") // Draft | Published (docs/refactor.md section 14)
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  executions  Execution[]
+  versions    WorkflowVersion[]
+}
+
+/// Immutable snapshot of a workflow definition, written on every publish. Lets a
+/// run record which definition it executed, which is what Draft/Published is for
+/// (docs/refactor.md section 14). PostgreSQL/pgvector is still deferred: these are
+/// SQLite-safe String columns holding JSON, not a Json column.
+model WorkflowVersion {
+  id            String   @id @default(cuid())
+  workflowId    String
+  version       Int
+  status        String   @default("Draft") // Draft | Published
+  definition    String   // { name, description, nodes, connections } as JSON string
+  changeNote    String?
+  createdAt     DateTime @default(now())
+  workflow      Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, version])
+  @@index([workflowId])
+}
+
+model Agent {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   @default("StandardAgent")
+  prompt      String?
+  model       String?  @default("gpt-4")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Execution {
+  id              String   @id @default(cuid())
+  workflowId      String?
+  workflowName    String?
+  status          String   @default("Pending")
+  startTime       DateTime @default(now())
+  endTime         DateTime?
+  duration        Float?   // milliseconds
+  outputs         String?  // execution outputs serialized as JSON string
+  errors          String?  // execution errors serialized as JSON string
+  nodeResults     String?  // NodeExecutionResult[] serialized as JSON string (per-node state for the designer)
+  version         Int?     // Workflow.version this run executed
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  workflow        Workflow? @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+
+  @@index([workflowId])
+}
+
+model CustomSnippet {
+  id          String   @id @default(cuid())
+  name        String
+  runtime     String   @default("PolyglotKernel")
+  description String?
+  inputs      String   // JSON string: CustomSnippetIO[]
+  outputs     String   // JSON string: CustomSnippetIO[]
+  action      String   // JSON string: snippet action payload (e.g. { kind: "dotnet-hello-world" })
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

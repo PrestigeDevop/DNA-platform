@@ -1,0 +1,8 @@
+{
+  "serverId": "example-tools",
+  "name": "Example Tools",
+  "version": "1.0.0",
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\\\temp"],
+  "env": {}
+}

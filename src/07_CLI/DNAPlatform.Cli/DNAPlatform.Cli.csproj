@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>DNAPlatform.Cli</RootNamespace>
+    <AssemblyName>dnaplatform</AssemblyName>
+    <!--
+      The CLI is a thin HTTP client over the running DevUI API
+      (docs/refactor.md sections 6 and 15). It deliberately has NO
+      ProjectReference to DNAPlatform.AgentFramework: instantiating the engine here
+      would create a second execution path, which section 15 forbids.
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+  </ItemGroup>
+
+</Project>

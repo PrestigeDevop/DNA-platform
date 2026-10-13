@@ -1,0 +1,30 @@
+{
+  "name": "dna-platform-acp-adapter",
+  "version": "0.1.0",
+  "description": "ACP adapter for DNA Platform - maps ACP methods to HTTP calls to .NET backend",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "test": "node --test dist/test/smoke.test.js",
+    "smoke": "tsx src/test/smoke.test.ts"
+  },
+  "keywords": [
+    "acp",
+    "agent-client-protocol",
+    "dna-platform"
+  ],
+  "author": "",
+  "license": "Apache-2.0",
+  "type": "module",
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^1.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  }
+}
