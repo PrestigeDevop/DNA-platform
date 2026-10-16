@@ -1,525 +1,1346 @@
-﻿<script lang="ts">
-	import { onMount } from 'svelte';
+<script lang="ts">
+  import { onMount } from 'svelte';
 
-	interface Tool {
-		Name: string;
-		Description: string;
-		InputSchema: Record<string, { propName: string }> | null;
-	}
+  interface Tool {
+    Name: string;
+    Description: string;
+    InputSchema?: Record<string, { propName: string; description?: string }> | null;
+  }
 
-	interface Server {
-		ServerId: string;
-		Name: string;
-		Version: string;
-		Status: string;
-		Message?: string;
-		Tools: Tool[];
-	}
+  interface Server {
+    ServerId: string;
+    Name: string;
+    Version: string;
+    Status: string;
+    Category?: string;
+    Message?: string;
+    Tools: Tool[];
+  }
 
-	interface ApiResponse {
-		Count: number;
-		Servers: Server[];
-	}
+  interface MarketplaceItem {
+    id: string;
+    name: string;
+    author: string;
+    version: string;
+    description: string;
+    category: string;
+    icon: string;
+    installed: boolean;
+    featured: boolean;
+    tags: string[];
+    toolsCount: number;
+    agentTemplate?: any;
+  }
 
-	interface ImportResponse {
-		ServerId: string;
-		Name: string;
-		Version: string;
-		Status: string;
-		Tools: { Name: string; Description: string }[];
-	}
+  interface NotebookCell {
+    id: string;
+    language: string;
+    source: string;
+    outputs?: any[];
+    output?: string;
+    running?: boolean;
+    durationMs?: number;
+  }
 
-	let servers: Server[] = [];
-	let loading = true;
-	let error: string | null = null;
-	let showImportModal = false;
-	let importError: string | null = null;
-	let importSuccess = '';
-	let manifestText = `{
-  "ServerId": "example-server",
-  "Name": "Example MCP Server",
-  "Version": "1.0.0",
-  "Command": "npx",
-  "Args": ["-y", "@modelcontextprotocol/server-example"],
-  "Env": {}
+  let activeTab: 'marketplace' | 'servers' | 'test' | 'polyglot' | 'author' = 'marketplace';
+  let servers: Server[] = [];
+  let marketplaceItems: MarketplaceItem[] = [];
+  let loading = true;
+  let error: string | null = null;
+  let message = '';
+
+  // Filter & Search
+  let searchQuery = '';
+  let selectedCategory = 'All';
+  const categories = ['All', 'AI & Inference', 'Bioinformatics', 'System', 'Agents', 'Smart Component', 'Polyglot'];
+
+  // Test tool state
+  let selectedServerId = '';
+  let selectedToolName = '';
+  let toolArgsText = '{\n  "sequence": "ATGGTGCACCTGACTCCTGAGGAGAAGTCTGCC"\n}';
+  let toolRunning = false;
+  let toolResult: any = null;
+  let toolError = '';
+
+  // Import modal
+  let showImportModal = false;
+  let importText = `{
+  "serverId": "custom-dna-annotator",
+  "name": "Custom DNA Annotator",
+  "version": "1.0.0",
+  "category": "Extensions",
+  "description": "High-throughput genomic feature annotation",
+  "tools": [
+    { "name": "annotate_genes", "description": "Annotate coding sequences" }
+  ]
 }`;
 
-	async function fetchServers() {
-		loading = true;
-		error = null;
-		try {
-			const res = await fetch('/api/mcp/servers');
-			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			const data: ApiResponse = await res.json();
-			servers = data.Servers || [];
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load servers';
-		} finally {
-			loading = false;
-		}
-	}
+  // Polyglot Notebook State
+  let notebookCells: NotebookCell[] = [];
+  let notebookTitle = 'DryLab_Poc_.ipynb (Jupyter Notebook)';
+  let activeKernel = 'Polyglot (.NET C# / Python / Node)';
+  let loadingNotebook = false;
 
-	async function importManifest() {
-		importError = null;
-		importSuccess = '';
-		try {
-			const manifest = JSON.parse(manifestText);
-			const res = await fetch('/api/mcp/servers/import', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(manifest)
-			});
-			if (!res.ok) {
-				const err = await res.json();
-				throw new Error(err.Error || `HTTP ${res.status}`);
-			}
-			const data: ImportResponse = await res.json();
-			await fetchServers();
-			importSuccess = `Imported "${data.Name}" (${data.ServerId})`;
-			manifestText = `{
-  "ServerId": "example-server",
-  "Name": "Example MCP Server",
-  "Version": "1.0.0",
-  "Command": "npx",
-  "Args": ["-y", "@modelcontextprotocol/server-example"],
-  "Env": {}
-}`;
-		} catch (e) {
-			importError = e instanceof Error ? e.message : 'Import failed';
-		}
-	}
+  // Authoring Studio State
+  let authorName = 'DNA Mutation Analyzer';
+  let authorCategory = 'Bioinformatics';
+  let authorIcon = '🔬';
+  let authorScript = `// Custom DNA Mutation Analyzer
+const seq = String(input).toUpperCase();
+const mutations = [];
+for (let i = 0; i < seq.length; i++) {
+  if (seq[i] === 'G' && i % 3 === 0) {
+    mutations.push({ position: i + 1, original: 'A', mutated: 'G', type: 'transition' });
+  }
+}
+return {
+  analyzed_sequence: seq,
+  mutation_count: mutations.length,
+  mutations,
+  summary: mutations.length > 0 ? "Potential genomic variants detected" : "Conserved sequence"
+};`;
+  let authoringSaving = false;
 
-	function handleFileImport(event: Event) {
-		const input = event.target as HTMLInputElement;
-		const file = input.files?.[0];
-		if (!file) return;
-		const reader = new FileReader();
-		reader.onload = (e) => {
-			manifestText = e.target?.result as string;
-			showImportModal = true;
-		};
-		reader.readAsText(file);
-		input.value = '';
-	}
+  onMount(async () => {
+    await refreshAll();
+    await loadNotebook();
+  });
 
-	function getStatusColor(status: string): string {
-		const s = status.toLowerCase();
-		if (s === 'running') return 'green';
-		if (s === 'pending') return 'yellow';
-		if (s === 'error') return 'red';
-		return 'grey';
-	}
+  async function refreshAll() {
+    loading = true;
+    error = null;
+    try {
+      const [resServers, resMarket] = await Promise.all([
+        fetch('/api/mcp/servers'),
+        fetch('/api/mcp/marketplace')
+      ]);
 
-	function getStatusBadge(status: string) {
-		const color = getStatusColor(status);
-		const bg = {
-			green: 'rgba(34, 197, 94, 0.15)',
-			yellow: 'rgba(234, 179, 8, 0.15)',
-			red: 'rgba(239, 68, 68, 0.15)',
-			grey: 'rgba(148, 163, 184, 0.15)'
-		}[color];
-		const text = {
-			green: '#22c55e',
-			yellow: '#eab308',
-			red: '#ef4444',
-			grey: '#94a3b8'
-		}[color];
-		return { bg, text };
-	}
+      if (resServers.ok) {
+        const data = await resServers.json();
+        servers = data.Servers || [];
+        if (servers.length > 0 && !selectedServerId) {
+          selectedServerId = servers[0].ServerId;
+          if (servers[0].Tools.length > 0) {
+            selectedToolName = servers[0].Tools[0].Name;
+          }
+        }
+      }
 
-	onMount(fetchServers);
+      if (resMarket.ok) {
+        const mData = await resMarket.json();
+        marketplaceItems = mData.plugins || [];
+      }
+    } catch (e: any) {
+      error = e.message || 'Failed to load MCP servers';
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function loadNotebook() {
+    loadingNotebook = true;
+    try {
+      const res = await fetch('/api/polyglot/notebook');
+      if (res.ok) {
+        const data = await res.json();
+        notebookTitle = data.title || notebookTitle;
+        activeKernel = data.kernel || activeKernel;
+        notebookCells = data.cells || [];
+      }
+    } catch {
+      // ignore
+    } finally {
+      loadingNotebook = false;
+    }
+  }
+
+  async function runCell(cell: NotebookCell) {
+    cell.running = true;
+    cell.output = '';
+    try {
+      const res = await fetch('/api/polyglot/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language: cell.language,
+          code: cell.source
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        cell.output = data.output;
+        cell.durationMs = data.durationMs;
+      } else {
+        cell.output = `Error: ${data.error || 'Execution failed'}`;
+      }
+    } catch (e: any) {
+      cell.output = `Network error: ${e.message}`;
+    } finally {
+      cell.running = false;
+      notebookCells = [...notebookCells];
+    }
+  }
+
+  function addCell(lang: 'csharp' | 'python' | 'javascript') {
+    const templates: Record<string, string> = {
+      csharp: '// C# DateTime Provider\nusing System;\nConsole.WriteLine($"Current Time (UTC): {DateTime.UtcNow:o}");\nConsole.WriteLine($"Ticks: {DateTime.UtcNow.Ticks}");',
+      python: '# Python BioInformatics Cell\nseq = "ATGGTGCACCTGACTCCTGAGGAGAAGTCTGCC"\nprint(f"Sequence: {seq} (Length: {len(seq)} bp)")',
+      javascript: '// JavaScript / Node.js Cell\nconst mem = process.memoryUsage();\nconsole.log(`Heap Used: ${(mem.heapUsed / 1024 / 1024).toFixed(2)} MB`);'
+    };
+
+    notebookCells = [
+      ...notebookCells,
+      {
+        id: `cell-${Date.now()}`,
+        language: lang,
+        source: templates[lang] || '// New cell',
+        output: ''
+      }
+    ];
+  }
+
+  async function toggleInstall(plugin: MarketplaceItem) {
+    try {
+      const action = plugin.installed ? 'uninstall' : 'install';
+      const res = await fetch('/api/mcp/marketplace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: plugin.id, action })
+      });
+
+      if (res.ok) {
+        plugin.installed = !plugin.installed;
+        marketplaceItems = [...marketplaceItems];
+        message = `${plugin.name} ${action === 'install' ? 'installed and active' : 'uninstalled'}.`;
+        setTimeout(() => (message = ''), 3000);
+        await refreshAll();
+      }
+    } catch (e: any) {
+      error = e.message || 'Failed to update plugin';
+    }
+  }
+
+  async function runToolTest() {
+    if (!selectedServerId || !selectedToolName) return;
+    toolRunning = true;
+    toolError = '';
+    toolResult = null;
+
+    try {
+      let parsedArgs = {};
+      try {
+        parsedArgs = JSON.parse(toolArgsText);
+      } catch {
+        toolError = 'Arguments must be valid JSON';
+        toolRunning = false;
+        return;
+      }
+
+      const res = await fetch('/api/mcp/tools/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serverId: selectedServerId,
+          toolName: selectedToolName,
+          args: parsedArgs
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        toolError = data.error || 'Execution failed';
+      } else {
+        toolResult = data.result;
+      }
+    } catch (e: any) {
+      toolError = e.message || 'Tool execution network failure';
+    } finally {
+      toolRunning = false;
+    }
+  }
+
+  async function onImportManifest() {
+    try {
+      const res = await fetch('/api/mcp/servers/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: importText
+      });
+      if (!res.ok) throw new Error('Import failed');
+      showImportModal = false;
+      message = 'MCP server manifest imported successfully!';
+      setTimeout(() => (message = ''), 3000);
+      await refreshAll();
+    } catch (e: any) {
+      error = e.message || 'Failed to import server';
+    }
+  }
+
+  async function onAuthorSkill() {
+    if (!authorName.trim()) return;
+    authoringSaving = true;
+    try {
+      const res = await fetch('/api/skills/author', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: authorName,
+          category: authorCategory,
+          icon: authorIcon,
+          script: authorScript
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        message = `Skill "${authorName}" created and annotated with Microsoft Copilot! Active in MCP registry.`;
+        setTimeout(() => (message = ''), 4000);
+        await refreshAll();
+      } else {
+        error = data.error || 'Failed to author skill';
+      }
+    } catch (e: any) {
+      error = e.message || 'Error saving skill';
+    } finally {
+      authoringSaving = false;
+    }
+  }
+
+  $: currentServerTools = servers.find((s) => s.ServerId === selectedServerId)?.Tools || [];
+
+  $: filteredMarketplace = marketplaceItems.filter((item) => {
+    if (selectedCategory !== 'All' && item.category !== selectedCategory) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return (
+        item.name.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q) ||
+        item.tags.some((t) => t.toLowerCase().includes(q))
+      );
+    }
+    return true;
+  });
 </script>
 
-<style>
-	.container {
-		padding: 1.5rem;
-		background: var(--bg-card);
-		border-radius: 8px;
-		border: 1px solid var(--border);
-		min-height: 400px;
-	}
+<div class="mcp-shell">
+  <div class="mcp-header">
+    <div class="title-area">
+      <div class="badge">Model Context Protocol</div>
+      <h2>MCP Ecosystem & market_place</h2>
+      <p class="subtitle">
+        Extensible MCP tools, Microsoft Copilot local reasoning, C# .NET 8 runtime, and Polyglot Jupyter notebook kernel.
+      </p>
+    </div>
+    <div class="top-actions">
+      <button class="btn secondary" on:click={() => (showImportModal = true)}>➕ Import Manifest</button>
+      <button class="btn primary" on:click={refreshAll}>🔄 Refresh Registry</button>
+    </div>
+  </div>
 
-	.header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 1.5rem;
-	}
+  {#if message}
+    <div class="alert info">{message}</div>
+  {/if}
+  {#if error}
+    <div class="alert error">{error}</div>
+  {/if}
 
-	.title {
-		font-size: 1.25rem;
-		font-weight: 600;
-		color: #e2e8f0;
-	}
+  <!-- TABS -->
+  <div class="tabs">
+    <button
+      class="tab-btn"
+      class:active={activeTab === 'marketplace'}
+      on:click={() => (activeTab = 'marketplace')}
+    >
+      🛒 market_place ({marketplaceItems.length})
+    </button>
+    <button
+      class="tab-btn"
+      class:active={activeTab === 'servers'}
+      on:click={() => (activeTab = 'servers')}
+    >
+      ⚡ Active MCP Servers ({servers.length})
+    </button>
+    <button
+      class="tab-btn"
+      class:active={activeTab === 'test'}
+      on:click={() => (activeTab = 'test')}
+    >
+      🔬 Execute MCP Tool
+    </button>
+    <button
+      class="tab-btn"
+      class:active={activeTab === 'polyglot'}
+      on:click={() => (activeTab = 'polyglot')}
+    >
+      📓 Polyglot Kernel (Jupyter)
+    </button>
+    <button
+      class="tab-btn"
+      class:active={activeTab === 'author'}
+      on:click={() => (activeTab = 'author')}
+    >
+      ✍️ Authoring Studio
+    </button>
+  </div>
 
-	.btn {
-		padding: 0.5rem 1rem;
-		border-radius: 6px;
-		border: 1px solid var(--border);
-		background: var(--bg-card);
-		color: #e2e8f0;
-		cursor: pointer;
-		font-size: 0.875rem;
-		transition: all 0.15s;
-	}
+  <!-- TAB 1: market_place -->
+  {#if activeTab === 'marketplace'}
+    <div class="market-controls">
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          bind:value={searchQuery}
+          placeholder="Filter extensions, agents, smart components, bioinformatics..."
+        />
+      </div>
+      <div class="category-chips">
+        {#each categories as cat}
+          <button
+            class="cat-chip"
+            class:active={selectedCategory === cat}
+            on:click={() => (selectedCategory = cat)}
+          >
+            {cat}
+          </button>
+        {/each}
+      </div>
+    </div>
 
-	.btn:hover {
-		background: var(--primary);
-		border-color: var(--primary);
-	}
+    <div class="marketplace-grid">
+      {#each filteredMarketplace as item}
+        <div class="market-card" class:installed={item.installed}>
+          <div class="market-top">
+            <span class="market-icon">{item.icon}</span>
+            <div class="market-meta">
+              <h3>{item.name}</h3>
+              <span class="author">by {item.author} · v{item.version}</span>
+            </div>
+            {#if item.featured}
+              <span class="pill featured">Featured</span>
+            {/if}
+          </div>
 
-	.btn-primary {
-		background: var(--primary);
-		border-color: var(--primary);
-	}
+          <p class="market-desc">{item.description}</p>
 
-	.btn-primary:hover {
-		filter: brightness(1.1);
-	}
+          {#if item.agentTemplate}
+            <div class="kilo-agent-box">
+              <span class="kilo-badge">Agent Spec</span>
+              <code>Mode: {item.agentTemplate.mode}</code>
+              <p class="kilo-prompt">{item.agentTemplate.systemPrompt.slice(0, 85)}...</p>
+            </div>
+          {/if}
 
-	.btn-group {
-		display: flex;
-		gap: 0.5rem;
-	}
+          <div class="market-tags">
+            <span class="tag category">{item.category}</span>
+            {#each item.tags as tag}
+              <span class="tag">#{tag}</span>
+            {/each}
+          </div>
 
-	.loading,
-	.empty,
-	.error-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		padding: 3rem;
-		color: #94a3b8;
-		gap: 0.5rem;
-	}
+          <div class="market-footer">
+            <span class="tools-count">{item.toolsCount} registered tool(s)</span>
+            <button
+              class="install-btn"
+              class:installed={item.installed}
+              on:click={() => toggleInstall(item)}
+            >
+              {item.installed ? '✓ Active' : '+ Install Plugin'}
+            </button>
+          </div>
+        </div>
+      {/each}
+    </div>
 
-	.error-state {
-		color: #ef4444;
-	}
+  <!-- TAB 2: ACTIVE SERVERS -->
+  {:else if activeTab === 'servers'}
+    <div class="servers-list">
+      {#each servers as s}
+        <div class="server-item">
+          <div class="server-head">
+            <div>
+              <h3>{s.Name}</h3>
+              <span class="server-id"><code>{s.ServerId}</code> · v{s.Version}</span>
+            </div>
+            <span class="status-indicator live">● {s.Status}</span>
+          </div>
 
-	.server-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-		gap: 1rem;
-	}
+          {#if s.Message}
+            <p class="server-msg">{s.Message}</p>
+          {/if}
 
-	.server-card {
-		background: var(--bg-card);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		padding: 1rem;
-	}
+          <div class="tools-container">
+            <h4>Exposed MCP Tools:</h4>
+            <div class="tools-grid">
+              {#each s.Tools as t}
+                <div class="tool-badge">
+                  <strong>{t.Name}</strong>
+                  <span>{t.Description}</span>
+                </div>
+              {/each}
+            </div>
+          </div>
+        </div>
+      {/each}
+    </div>
 
-	.server-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		margin-bottom: 0.75rem;
-	}
+  <!-- TAB 3: TOOL TEST CONSOLE -->
+  {:else if activeTab === 'test'}
+    <div class="test-console">
+      <div class="test-panel inputs">
+        <h3>Execute MCP Tool</h3>
+        <div class="field">
+          <label>Target MCP Server</label>
+          <select
+            bind:value={selectedServerId}
+            on:change={() => (selectedToolName = currentServerTools[0]?.Name || '')}
+          >
+            {#each servers as s}
+              <option value={s.ServerId}>{s.Name} ({s.ServerId})</option>
+            {/each}
+          </select>
+        </div>
 
-	.server-name {
-		font-weight: 600;
-		color: #e2e8f0;
-		font-size: 1rem;
-	}
+        <div class="field">
+          <label>Select Tool</label>
+          <select bind:value={selectedToolName}>
+            {#each currentServerTools as t}
+              <option value={t.Name}>{t.Name} — {t.Description}</option>
+            {/each}
+          </select>
+        </div>
 
-	.server-version {
-		color: #94a3b8;
-		font-size: 0.75rem;
-		margin-left: 0.5rem;
-	}
+        <div class="field">
+          <label>Tool Arguments (JSON)</label>
+          <textarea rows="7" bind:value={toolArgsText}></textarea>
+        </div>
 
-	.status-badge {
-		padding: 0.25rem 0.5rem;
-		border-radius: 9999px;
-		font-size: 0.7rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
+        <div class="field presets-row">
+          <span class="label-sub">Quick Arguments:</span>
+          <button
+            type="button"
+            class="mini-btn"
+            on:click={() => {
+              if (selectedToolName === 'get_current_time') {
+                toolArgsText = '{\n  "format": "o"\n}';
+              } else if (selectedToolName === 'data_transform') {
+                toolArgsText = '{\n  "data": "atggtgcacctgactcctgaggagaagtctgcc",\n  "mode": "reverse"\n}';
+              } else if (selectedToolName === 'reverse_complement') {
+                toolArgsText = '{\n  "sequence": "ATGGTGCACCTGACTCCTGAGGAGAAGTCTGCC"\n}';
+              } else {
+                toolArgsText = '{\n  "sequence": "ATGGTGCACCTGACTCCTGAGGAGAAGTCTGCC"\n}';
+              }
+            }}
+          >
+            Load Sample
+          </button>
+        </div>
 
-	.server-message {
-		color: #94a3b8;
-		font-size: 0.8rem;
-		margin-bottom: 0.75rem;
-		font-style: italic;
-	}
+        <button class="btn primary execute" on:click={runToolTest} disabled={toolRunning}>
+          {toolRunning ? 'Executing...' : '▶ Run Tool Call'}
+        </button>
+      </div>
 
-	.tools-section {
-		border-top: 1px solid var(--border);
-		padding-top: 0.75rem;
-	}
+      <div class="test-panel results">
+        <h3>Execution Output</h3>
+        {#if toolError}
+          <div class="alert error">{toolError}</div>
+        {:else if toolResult}
+          <pre class="result-code">{JSON.stringify(toolResult, null, 2)}</pre>
+        {:else}
+          <div class="empty-state">Select a tool and click "Run Tool Call" to inspect live response.</div>
+        {/if}
+      </div>
+    </div>
 
-	.tools-label {
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: #94a3b8;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		margin-bottom: 0.5rem;
-	}
+  <!-- TAB 4: POLYGLOT JUPYTER KERNEL -->
+  {:else if activeTab === 'polyglot'}
+    <div class="polyglot-view">
+      <div class="polyglot-header">
+        <div>
+          <h3>📓 {notebookTitle}</h3>
+          <p class="subtitle">Polyglot .NET Interactive / Jupyter Runtime (C#, Python, Node.js)</p>
+        </div>
+        <div class="polyglot-actions">
+          <button class="btn secondary" on:click={() => addCell('csharp')}>+ C# Cell</button>
+          <button class="btn secondary" on:click={() => addCell('python')}>+ Python Cell</button>
+          <button class="btn secondary" on:click={() => addCell('javascript')}>+ Node.js Cell</button>
+        </div>
+      </div>
 
-	.tool-item {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-		padding: 0.5rem 0;
-		border-bottom: 1px solid var(--border);
-	}
+      {#if loadingNotebook}
+        <div class="loading">Loading notebook cells...</div>
+      {:else}
+        <div class="notebook-cells">
+          {#each notebookCells as cell, idx}
+            <div class="cell-card">
+              <div class="cell-head">
+                <span class="cell-index">[{idx + 1}]</span>
+                <span class="cell-lang badge-{cell.language}">{cell.language.toUpperCase()}</span>
+                {#if cell.durationMs}
+                  <span class="cell-dur">{cell.durationMs} ms</span>
+                {/if}
+                <button
+                  class="btn-run"
+                  on:click={() => runCell(cell)}
+                  disabled={cell.running}
+                >
+                  {cell.running ? 'Running...' : '▶ Run Cell'}
+                </button>
+              </div>
 
-	.tool-item:last-child {
-		border-bottom: none;
-	}
+              <textarea class="cell-editor" rows="4" bind:value={cell.source}></textarea>
 
-	.tool-name {
-		font-weight: 500;
-		color: #e2e8f0;
-		font-size: 0.85rem;
-	}
+              {#if cell.output}
+                <div class="cell-output">
+                  <div class="output-label">Output:</div>
+                  <pre>{cell.output}</pre>
+                </div>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
 
-	.tool-description {
-		color: #94a3b8;
-		font-size: 0.75rem;
-	}
+  <!-- TAB 5: AUTHORING STUDIO -->
+  {:else if activeTab === 'author'}
+    <div class="authoring-view">
+      <div class="author-card">
+        <h3>✍️ Author Custom Skill or Smart Component</h3>
+        <p class="subtitle">
+          Create new bioinformatic modules or smart components annotated by Microsoft Copilot, published live into market_place.
+        </p>
 
-	.tool-schema {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.25rem;
-		margin-top: 0.25rem;
-	}
+        <div class="form-grid">
+          <div class="field">
+            <label>Component / Skill Name</label>
+            <input type="text" bind:value={authorName} placeholder="e.g. DNA Splice Junction Detector" />
+          </div>
 
-	.schema-tag {
-		background: var(--primary);
-		color: white;
-		padding: 0.125rem 0.375rem;
-		border-radius: 4px;
-		font-size: 0.65rem;
-		font-family: monospace;
-	}
+          <div class="field">
+            <label>Category</label>
+            <select bind:value={authorCategory}>
+              <option value="Bioinformatics">Bioinformatics</option>
+              <option value="Smart Component">Smart Component</option>
+              <option value="AI & Inference">AI & Inference</option>
+              <option value="System & Utility">System & Utility</option>
+            </select>
+          </div>
 
-	.modal-overlay {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.6);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 100;
-		padding: 1rem;
-	}
+          <div class="field">
+            <label>Icon</label>
+            <input type="text" bind:value={authorIcon} style="width: 60px;" />
+          </div>
+        </div>
 
-	.modal {
-		background: var(--bg-card);
-		border: 1px solid var(--border);
-		border-radius: 12px;
-		width: 100%;
-		max-width: 600px;
-		max-height: 80vh;
-		overflow: hidden;
-		display: flex;
-		flex-direction: column;
-	}
+        <div class="field">
+          <label>Logic Script (JavaScript / C# Interop)</label>
+          <textarea rows="9" bind:value={authorScript} class="code-textarea"></textarea>
+          <span class="hint-text">
+            Microsoft Copilot automatically infers parameter schemas and attaches execution hooks.
+          </span>
+        </div>
 
-	.modal-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 1rem 1.5rem;
-		border-bottom: 1px solid var(--border);
-	}
+        <div class="author-actions">
+          <button
+            class="btn primary"
+            on:click={onAuthorSkill}
+            disabled={authoringSaving}
+          >
+            {authoringSaving ? 'Registering with Copilot...' : '🚀 Register & Publish to market_place'}
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
 
-	.modal-title {
-		font-weight: 600;
-		color: #e2e8f0;
-		font-size: 1.1rem;
-	}
-
-	.modal-close {
-		background: none;
-		border: none;
-		color: #94a3b8;
-		cursor: pointer;
-		font-size: 1.5rem;
-		line-height: 1;
-		padding: 0;
-	}
-
-	.modal-close:hover {
-		color: #e2e8f0;
-	}
-
-	.modal-body {
-		padding: 1.5rem;
-		overflow-y: auto;
-	}
-
-	.modal-footer {
-		display: flex;
-		justify-content: flex-end;
-		gap: 0.75rem;
-		padding: 1rem 1.5rem;
-		border-top: 1px solid var(--border);
-	}
-
-	.textarea {
-		width: 100%;
-		min-height: 250px;
-		padding: 0.75rem;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		background: #0f172a;
-		color: #e2e8f0;
-		font-family: monospace;
-		font-size: 0.8rem;
-		line-height: 1.5;
-		resize: vertical;
-		box-sizing: border-box;
-	}
-
-	.textarea:focus {
-		outline: none;
-		border-color: var(--primary);
-	}
-
-	.modal-error {
-		color: #ef4444;
-		font-size: 0.85rem;
-		margin-bottom: 1rem;
-		padding: 0.75rem;
-		background: rgba(239, 68, 68, 0.1);
-		border-radius: 6px;
-		border: 1px solid rgba(239, 68, 68, 0.2);
-	}
-
-	.modal-success {
-		color: #22c55e;
-		font-size: 0.85rem;
-		margin-bottom: 1rem;
-		padding: 0.75rem;
-		background: rgba(34, 197, 94, 0.1);
-		border-radius: 6px;
-		border: 1px solid rgba(34, 197, 94, 0.2);
-	}
-
-	.file-input {
-		display: none;
-	}
-</style>
-
-<div class="container">
-	<div class="header">
-		<h2 class="title">MCP Servers</h2>
-		<div class="btn-group">
-			<button class="btn" on:click={() => (showImportModal = true)}>Browse marketplace</button>
-			<label class="btn" for="file-import">Install from file</label>
-			<input
-				id="file-import"
-				type="file"
-				class="file-input"
-				accept=".json"
-				on:change={handleFileImport}
-			/>
-		</div>
-	</div>
-
-	{#if loading}
-		<div class="loading">Loading servers�</div>
-	{:else if error}
-		<div class="error-state">
-			<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-				<circle cx="12" cy="12" r="10"></circle>
-				<line x1="15" y1="9" x2="9" y2="15"></line>
-				<line x1="9" y1="9" x2="15" y2="15"></line>
-			</svg>
-			<span>{error}</span>
-			<button class="btn btn-primary" on:click={fetchServers}>Retry</button>
-		</div>
-	{:else if servers.length === 0}
-		<div class="empty">
-			<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-				<rect x="2" y="3" width="20" height="14" rx="2"></rect>
-				<path d="M8 21h8"></path>
-				<path d="M12 17v4"></path>
-			</svg>
-			<span>No MCP servers configured</span>
-			<button class="btn btn-primary" on:click={() => (showImportModal = true)}>Add your first server</button>
-		</div>
-	{:else}
-		<div class="server-grid">
-			{#each servers as server}
-				<div class="server-card">
-					<div class="server-header">
-						<div>
-							<span class="server-name">{server.Name}</span>
-							{#if server.Version}
-								<span class="server-version">v{server.Version}</span>
-							{/if}
-						</div>
-						{#if server.Status}
-							{@const badge = getStatusBadge(server.Status)}
-							<span class="status-badge" style="background: {badge.bg}; color: {badge.text};">
-								{server.Status}
-							</span>
-						{/if}
-					</div>
-					{#if server.Message}
-						<div class="server-message">{server.Message}</div>
-					{/if}
-					<div class="tools-section">
-						<div class="tools-label">Tools ({server.Tools.length})</div>
-						{#each server.Tools as tool}
-							<div class="tool-item">
-								<span class="tool-name">{tool.Name}</span>
-								{#if tool.Description}
-									<span class="tool-description">{tool.Description}</span>
-								{/if}
-								{#if tool.InputSchema && Object.keys(tool.InputSchema).length > 0}
-									<div class="tool-schema">
-										{#each Object.keys(tool.InputSchema) as key}
-											<span class="schema-tag">{key}</span>
-										{/each}
-									</div>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				</div>
-			{/each}
-		</div>
-	{/if}
+  <!-- IMPORT MODAL -->
+  {#if showImportModal}
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <h3>Import MCP Server Manifest</h3>
+        <p class="hint">Provide server specification JSON:</p>
+        <textarea rows="10" bind:value={importText}></textarea>
+        <div class="modal-actions">
+          <button class="btn secondary" on:click={() => (showImportModal = false)}>Cancel</button>
+          <button class="btn primary" on:click={onImportManifest}>Import Server</button>
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>
 
-{#if showImportModal}
-	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-	<div class="modal-overlay" on:click={() => (showImportModal = false)}>
-		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-		<div class="modal" on:click|stopPropagation>
-			<div class="modal-header">
-				<h3 class="modal-title">Import MCP Server</h3>
-				<button class="modal-close" on:click={() => (showImportModal = false)}>&times;</button>
-			</div>
-			<div class="modal-body">
-				{#if importError}
-					<div class="modal-error">{importError}</div>
-				{/if}
-				{#if importSuccess}
-					<div class="modal-success">{importSuccess}</div>
-				{/if}
-				<textarea
-					class="textarea"
-					bind:value={manifestText}
-					placeholder='Paste manifest JSON here�'
-				></textarea>
-			</div>
-			<div class="modal-footer">
-				<button class="btn" on:click={() => (showImportModal = false)}>Cancel</button>
-				<button class="btn btn-primary" on:click={importManifest} disabled={loading}>Import</button>
-			</div>
-		</div>
-	</div>
-{/if}
+<style>
+  .mcp-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-top: 1rem;
+  }
 
+  .mcp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
 
+  .title-area h2 {
+    font-size: 1.4rem;
+    color: #f1f5f9;
+    margin: 0.35rem 0 0.2rem 0;
+  }
 
+  .subtitle {
+    color: #94a3b8;
+    font-size: 0.85rem;
+    margin: 0;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    background: rgba(14, 165, 233, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(14, 165, 233, 0.3);
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  .top-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .tab-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #94a3b8;
+    padding: 0.45rem 0.85rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.82rem;
+    transition: all 0.15s;
+  }
+
+  .tab-btn:hover {
+    color: #f1f5f9;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .tab-btn.active {
+    background: rgba(14, 165, 233, 0.15);
+    color: #38bdf8;
+    border-color: rgba(14, 165, 233, 0.3);
+    font-weight: 600;
+  }
+
+  /* MARKETPLACE */
+  .market-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .search-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #0f172a;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0.375rem;
+    padding: 0.4rem 0.75rem;
+  }
+
+  .search-bar input {
+    background: transparent;
+    border: none;
+    color: #f1f5f9;
+    font-size: 0.85rem;
+    width: 100%;
+  }
+
+  .search-bar input:focus {
+    outline: none;
+  }
+
+  .category-chips {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .cat-chip {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    padding: 0.25rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+
+  .cat-chip.active {
+    background: rgba(14, 165, 233, 0.2);
+    border-color: #38bdf8;
+    color: #38bdf8;
+  }
+
+  .marketplace-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+  }
+
+  .market-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    transition: transform 0.15s, border-color 0.15s;
+  }
+
+  .market-card:hover {
+    border-color: rgba(56, 189, 248, 0.4);
+    transform: translateY(-2px);
+  }
+
+  .market-card.installed {
+    border-color: rgba(34, 197, 94, 0.4);
+  }
+
+  .market-top {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+  }
+
+  .market-icon {
+    font-size: 1.75rem;
+  }
+
+  .market-meta h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #f1f5f9;
+  }
+
+  .market-meta .author {
+    font-size: 0.72rem;
+    color: #64748b;
+  }
+
+  .market-desc {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    line-height: 1.4;
+    margin: 0;
+  }
+
+  .pill.featured {
+    margin-left: auto;
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border-radius: 9999px;
+  }
+
+  .kilo-agent-box {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    border-radius: 0.375rem;
+    padding: 0.45rem;
+    font-size: 0.72rem;
+  }
+
+  .kilo-badge {
+    background: #0284c7;
+    color: white;
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.2rem;
+    font-weight: 600;
+    margin-right: 0.4rem;
+  }
+
+  .kilo-prompt {
+    margin: 0.3rem 0 0 0;
+    color: #cbd5e1;
+    font-style: italic;
+  }
+
+  .market-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .tag {
+    font-size: 0.68rem;
+    padding: 0.15rem 0.4rem;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 0.25rem;
+    color: #94a3b8;
+  }
+
+  .tag.category {
+    background: rgba(14, 165, 233, 0.15);
+    color: #38bdf8;
+  }
+
+  .market-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .tools-count {
+    font-size: 0.72rem;
+    color: #64748b;
+  }
+
+  .install-btn {
+    background: rgba(14, 165, 233, 0.2);
+    color: #38bdf8;
+    border: 1px solid rgba(14, 165, 233, 0.4);
+    padding: 0.3rem 0.7rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .install-btn.installed {
+    background: rgba(34, 197, 94, 0.2);
+    border-color: rgba(34, 197, 94, 0.4);
+    color: #4ade80;
+  }
+
+  /* SERVERS LIST */
+  .servers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .server-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1rem;
+  }
+
+  .server-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .server-head h3 {
+    margin: 0;
+    color: #f1f5f9;
+    font-size: 1rem;
+  }
+
+  .server-id {
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+
+  .status-indicator.live {
+    color: #4ade80;
+    font-size: 0.8rem;
+  }
+
+  .tools-container {
+    margin-top: 0.85rem;
+  }
+
+  .tools-container h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+  }
+
+  .tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .tool-badge {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.375rem;
+    padding: 0.45rem 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .tool-badge strong {
+    color: #38bdf8;
+    font-size: 0.78rem;
+    font-family: ui-monospace, monospace;
+  }
+
+  .tool-badge span {
+    color: #94a3b8;
+    font-size: 0.72rem;
+  }
+
+  /* TEST CONSOLE */
+  .test-console {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+  }
+
+  .test-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .test-panel h3 {
+    margin: 0;
+    color: #f1f5f9;
+    font-size: 0.95rem;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .field label {
+    font-size: 0.75rem;
+    color: #94a3b8;
+  }
+
+  .field select,
+  .field input,
+  .field textarea {
+    background: #090e17;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 0.375rem;
+    padding: 0.45rem 0.6rem;
+    color: #f1f5f9;
+    font-size: 0.8rem;
+    font-family: ui-monospace, monospace;
+  }
+
+  .presets-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .label-sub {
+    font-size: 0.72rem;
+    color: #64748b;
+  }
+
+  .mini-btn {
+    background: rgba(14, 165, 233, 0.15);
+    border: 1px solid rgba(14, 165, 233, 0.3);
+    color: #38bdf8;
+    padding: 0.2rem 0.45rem;
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+    cursor: pointer;
+  }
+
+  .result-code {
+    background: #090e17;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    font-size: 0.78rem;
+    color: #38bdf8;
+    overflow: auto;
+    max-height: 380px;
+  }
+
+  /* POLYGLOT JUPYTER VIEW */
+  .polyglot-view {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .polyglot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 0.85rem 1.25rem;
+  }
+
+  .polyglot-header h3 {
+    margin: 0;
+    color: #f1f5f9;
+    font-size: 1.05rem;
+  }
+
+  .polyglot-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .notebook-cells {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .cell-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .cell-head {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+  }
+
+  .cell-index {
+    color: #64748b;
+    font-family: ui-monospace, monospace;
+    font-size: 0.8rem;
+  }
+
+  .cell-lang {
+    font-size: 0.68rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.2rem;
+    font-weight: 700;
+  }
+
+  .badge-csharp {
+    background: rgba(168, 85, 247, 0.2);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.4);
+  }
+
+  .badge-python {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+  }
+
+  .badge-javascript,
+  .badge-node {
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.4);
+  }
+
+  .cell-dur {
+    font-size: 0.72rem;
+    color: #64748b;
+  }
+
+  .btn-run {
+    margin-left: auto;
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.4);
+    color: #4ade80;
+    padding: 0.25rem 0.6rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .cell-editor {
+    background: #090e17;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    color: #f1f5f9;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .cell-output {
+    background: rgba(0, 0, 0, 0.4);
+    border-left: 3px solid #38bdf8;
+    border-radius: 0.25rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .output-label {
+    font-size: 0.68rem;
+    color: #64748b;
+    text-transform: uppercase;
+  }
+
+  .cell-output pre {
+    margin: 0.25rem 0 0 0;
+    color: #e2e8f0;
+    font-family: ui-monospace, monospace;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+  }
+
+  /* AUTHORING STUDIO */
+  .author-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  .author-card h3 {
+    margin: 0;
+    color: #f1f5f9;
+    font-size: 1.1rem;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr auto;
+    gap: 0.75rem;
+  }
+
+  .code-textarea {
+    font-family: ui-monospace, monospace;
+    background: #090e17;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 0.375rem;
+    padding: 0.6rem;
+    color: #f1f5f9;
+    font-size: 0.82rem;
+  }
+
+  .hint-text {
+    font-size: 0.72rem;
+    color: #64748b;
+  }
+
+  /* COMMON BUTTONS & ALERTS */
+  .btn {
+    padding: 0.45rem 0.9rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+
+  .btn.primary {
+    background: var(--primary);
+    color: white;
+    border: none;
+  }
+
+  .btn.secondary {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #e2e8f0;
+  }
+
+  .alert {
+    padding: 0.5rem 0.85rem;
+    border-radius: 0.375rem;
+    font-size: 0.82rem;
+  }
+
+  .alert.info {
+    background: rgba(14, 165, 233, 0.15);
+    border: 1px solid rgba(14, 165, 233, 0.3);
+    color: #38bdf8;
+  }
+
+  .alert.error {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #f87171;
+  }
+
+  .empty-state {
+    color: #64748b;
+    font-style: italic;
+    font-size: 0.82rem;
+    text-align: center;
+    padding: 2rem 0;
+  }
+
+  /* MODAL */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+  }
+
+  .modal-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    width: 480px;
+    max-width: 90vw;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .modal-card h3 {
+    margin: 0;
+    color: #f1f5f9;
+  }
+
+  .modal-card textarea {
+    background: #090e17;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+    color: #f1f5f9;
+    font-family: ui-monospace, monospace;
+    font-size: 0.8rem;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+</style>

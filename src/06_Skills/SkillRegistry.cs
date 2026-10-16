@@ -56,6 +56,10 @@ namespace DNAPlatform.Skills
             var mergeResultsSkill = new MergeResultsSkill();
             _skills.TryAdd(mergeResultsSkill.SkillId, mergeResultsSkill);
 
+            // System Time Skill (C#)
+            var currentTimeSkill = new CurrentTimeSkill();
+            _skills.TryAdd(currentTimeSkill.SkillId, currentTimeSkill);
+
             // Bioinformatics Skills
             var fastaLoaderSkill = new FastaLoaderSkill();
             _skills.TryAdd(fastaLoaderSkill.SkillId, fastaLoaderSkill);

@@ -4,8 +4,8 @@ using RealSkillRegistry = DNAPlatform.Skills.ISkillRegistry;
 namespace DNAPlatform.AgentFramework;
 
 /// <summary>
-/// Adapts the real <see cref="RealSkillRegistry"/> in DNAPlatform.Skills — which
-/// self-registers the built-in and bioinformatics skills — to the engine's own
+/// Adapts the real <see cref="RealSkillRegistry"/> in DNAPlatform.Skills ï¿½ which
+/// self-registers the built-in and bioinformatics skills ï¿½ to the engine's own
 /// <see cref="ISkillRegistry"/> contract.
 ///
 /// <para>
@@ -92,7 +92,7 @@ internal class SkillAdapter : ISkill
 
 /// <summary>
 /// One place that registers the engine, so the DevUI API, the AGUI server, the
-/// ConsoleApp demo and the tests cannot drift apart (docs/refactor.md §15).
+/// ConsoleApp demo and the tests cannot drift apart (docs/refactor.md ï¿½15).
 ///
 /// <para>
 /// <b>Why this exists.</b> The DevUI API used to bind a second, in-memory

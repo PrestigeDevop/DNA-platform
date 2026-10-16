@@ -30,7 +30,7 @@ public class McpServersController : ControllerBase
     }
 
     /// <summary>
-    /// GET /api/mcp/servers — every discovered server with its runtime status and
+    /// GET /api/mcp/servers ï¿½ every discovered server with its runtime status and
     /// tool catalogue. Status is one of Pending / Running / Error / Stopped.
     /// </summary>
     [HttpGet]
@@ -59,7 +59,7 @@ public class McpServersController : ControllerBase
     }
 
     /// <summary>
-    /// POST /api/mcp/servers/import — accept a server manifest JSON body, write it to
+    /// POST /api/mcp/servers/import ï¿½ accept a server manifest JSON body, write it to
     /// the manifest directory and discover it. Returns the discovered server (or a
     /// 400 with an error body when the manifest is missing a command or the server
     /// fails to handshake).

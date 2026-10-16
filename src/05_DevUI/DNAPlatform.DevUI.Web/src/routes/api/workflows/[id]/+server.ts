@@ -2,20 +2,44 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/db';
 
+function safeParseJson(val: any): any[] {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    try {
+      let parsed = JSON.parse(val);
+      if (typeof parsed === 'string') {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch {
+          // ignore
+        }
+      }
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 // GET /api/workflows/{id} — get a single workflow
 export const GET: RequestHandler = async ({ params }) => {
   try {
     const workflow = await prisma.workflow.findUnique({
       where: { id: params.id },
     });
+
     if (!workflow) {
       return json({ error: `Workflow '${params.id}' not found` }, { status: 404 });
     }
+
     const result = {
       ...workflow,
-      nodes: workflow.nodes ? JSON.parse(workflow.nodes) : [],
-      connections: workflow.connections ? JSON.parse(workflow.connections) : [],
+      nodes: safeParseJson(workflow.nodes),
+      connections: safeParseJson(workflow.connections),
     };
+
     return json({ workflow: result });
   } catch (error) {
     console.error('Error fetching workflow:', error);
@@ -27,8 +51,8 @@ export const GET: RequestHandler = async ({ params }) => {
 export const PUT: RequestHandler = async ({ params, request }) => {
   try {
     const body = await request.json();
-
     const existing = await prisma.workflow.findUnique({ where: { id: params.id } });
+
     if (!existing) {
       return json({ error: `Workflow '${params.id}' not found` }, { status: 404 });
     }
@@ -37,18 +61,20 @@ export const PUT: RequestHandler = async ({ params, request }) => {
       ? body.status
       : existing.status;
 
-    // Publishing bumps the version and snapshots the definition, so a run can be
-    // traced to the exact definition it executed (docs/refactor.md section 14).
     const isPublishing = nextStatus === 'Published' && existing.status !== 'Published';
     const nextVersion = isPublishing ? existing.version + 1 : existing.version;
+
+    // Normalize nodes & connections to clean JSON strings without double-encoding
+    const normalizedNodes = safeParseJson(body.nodes);
+    const normalizedConnections = safeParseJson(body.connections);
 
     const workflow = await prisma.workflow.update({
       where: { id: params.id },
       data: {
         name: body.name,
         description: body.description || null,
-        nodes: body.nodes ? JSON.stringify(body.nodes) : undefined,
-        connections: body.connections ? JSON.stringify(body.connections) : undefined,
+        nodes: JSON.stringify(normalizedNodes),
+        connections: JSON.stringify(normalizedConnections),
         status: nextStatus,
         version: nextVersion,
       },
@@ -64,8 +90,8 @@ export const PUT: RequestHandler = async ({ params, request }) => {
           definition: JSON.stringify({
             name: workflow.name,
             description: workflow.description,
-            nodes: workflow.nodes ? JSON.parse(workflow.nodes) : [],
-            connections: workflow.connections ? JSON.parse(workflow.connections) : [],
+            nodes: normalizedNodes,
+            connections: normalizedConnections,
           }),
         },
       });
@@ -73,9 +99,10 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 
     const result = {
       ...workflow,
-      nodes: workflow.nodes ? JSON.parse(workflow.nodes) : [],
-      connections: workflow.connections ? JSON.parse(workflow.connections) : [],
+      nodes: normalizedNodes,
+      connections: normalizedConnections,
     };
+
     return json({ workflow: result });
   } catch (error) {
     console.error('Error updating workflow:', error);
@@ -89,6 +116,7 @@ export const DELETE: RequestHandler = async ({ params }) => {
     await prisma.workflow.delete({
       where: { id: params.id },
     });
+
     return json({ success: true, message: `Workflow '${params.id}' deleted` });
   } catch (error) {
     console.error('Error deleting workflow:', error);

@@ -147,7 +147,7 @@ internal sealed class LogStoreLogger : ILogger
 
         string message = formatter(state, exception) ?? string.Empty;
         if (message.Length > MaxMessageLength)
-            message = message.Substring(0, MaxMessageLength) + " …(truncated)";
+            message = message.Substring(0, MaxMessageLength) + " ï¿½(truncated)";
 
         _store.Add(new LogEntry
         {

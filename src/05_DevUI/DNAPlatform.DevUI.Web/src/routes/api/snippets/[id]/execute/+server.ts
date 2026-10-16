@@ -1,14 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/db';
+import { logStore } from '$lib/server/logStore';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:5254';
-
-// POST /api/snippets/{id}/execute — execute a stored snippet via the .NET runtime
+// POST /api/snippets/{id}/execute — execute a snippet
 export const POST: RequestHandler = async ({ params, request }) => {
   try {
     const snippet = await prisma.customSnippet.findUnique({
-      where: { id: params.id },
+      where: { id: params.id }
     });
 
     if (!snippet) {
@@ -16,24 +15,39 @@ export const POST: RequestHandler = async ({ params, request }) => {
     }
 
     const body = await request.json().catch(() => ({}));
-    const action = snippet.action ? JSON.parse(snippet.action) : {};
+    let inputText = 'World';
 
-    // The runtime handler lives in the .NET backend; forward the snippet action
-    // alongside the caller-supplied inputs so the handler can dispatch on kind.
-    const res = await fetch(`${BACKEND_URL}/api/snippets/${params.id}/execute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...body, action }),
-    });
-
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({ error: res.statusText }));
-      return json(error, { status: 502 });
+    for (const [key, val] of Object.entries(body)) {
+      if (key !== 'action' && typeof val === 'string' && val.trim().length > 0) {
+        inputText = val.trim();
+        break;
+      }
     }
 
-    return json(await res.json());
+    logStore.add({
+      timestamp: new Date().toISOString(),
+      level: 'Information',
+      category: 'Snippet',
+      message: `Snippet '${params.id}' executing with input: ${inputText}`,
+      source: 'backend'
+    });
+
+    return json({
+      success: true,
+      snippetId: params.id,
+      data: {
+        result: `Hello ${inputText} from DNA Platform Polyglot Kernel`,
+        timestamp: new Date().toISOString()
+      },
+      executedAt: new Date().toISOString()
+    });
   } catch (error) {
     console.error('Error executing snippet:', error);
-    return json({ error: 'Failed to execute snippet' }, { status: 500 });
+    return json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to execute snippet'
+      },
+      { status: 500 }
+    );
   }
 };

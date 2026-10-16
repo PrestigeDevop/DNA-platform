@@ -1,19 +1,14 @@
 /**
- * Unified log bus for the DevUI.
+ * Unified high-performance log bus for the DevUI.
  *
- * Collects two streams into one list so the web Logs page shows everything:
- *   1. FRONTEND - console.log/warn/error, window errors, and explicit log calls
- *      issued by the app (api.ts, page components, ...).
- *   2. BACKEND  - streamed from the .NET API via SSE at GET /api/logs/stream, with
- *      a fallback to polling GET /api/logs if EventSource fails.
- *
- * The backend writes through ILogger, and LogStoreLoggerProvider mirrors every
- * record into the in-memory buffer, so if a line appears in the CLI it also
- * appears here (and vice versa).
+ * Collects two streams into one list:
+ *   1. FRONTEND - safe console messages and explicit log calls.
+ *   2. BACKEND  - streamed from SvelteKit API via SSE at GET /api/logs/stream,
+ *      with smooth throttled batching to prevent browser UI freezing.
  */
 import { writable, get } from 'svelte/store';
 
-export type LogSource = "frontend" | "backend";
+export type LogSource = 'frontend' | 'backend';
 
 export interface LogRecord {
   id: number;
@@ -25,44 +20,91 @@ export interface LogRecord {
   exception?: string | null;
 }
 
-/** Live list of merged log records (oldest first). */
 export const logRecords = writable<LogRecord[]>([]);
-/** True while backend streaming or polling is active. */
 export const logStreaming = writable<boolean>(false);
-/** Last streaming/polling error, if the backend is unreachable. */
-export const logStreamError = writable<string>("");
+export const logStreamPaused = writable<boolean>(false);
+export const logStreamError = writable<string>('');
+export const consoleCaptureEnabled = writable<boolean>(false);
 
-const MAX_RECORDS = 500;
-const POLL_INTERVAL_MS = 1500;
-const RECONNECT_DELAY_MS = 5000;
+const MAX_RECORDS = 400;
+const BATCH_FLUSH_INTERVAL_MS = 150;
+const POLL_INTERVAL_MS = 3000;
 
-// Frontend ids count DOWN from -1 so they never collide with backend ids (positive).
 let frontendSeq = 0;
 let backendCursor = 0;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let consoleCaptured = false;
 let eventSource: EventSource | null = null;
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let isLogging = false;
 
-const NOISY_PATTERNS = ["[vite]", "[HMR]", "Download the Svelte"];
+// Internal batch queue to prevent store update storms
+let pendingQueue: LogRecord[] = [];
+const seenKeys = new Set<string>();
+
+const NOISY_PATTERNS = [
+  '[vite]',
+  '[HMR]',
+  'Download the Svelte',
+  'svelte-announcer',
+  'api/logs',
+  '__vite__',
+  'chrome-extension',
+  'node_modules',
+  'ResizeObserver loop',
+  ': keepalive'
+];
 
 function isNoisy(text: string): boolean {
+  if (!text || typeof text !== 'string') return true;
   return NOISY_PATTERNS.some((p) => text.includes(p));
+}
+
+function scheduleFlush() {
+  if (flushTimer) return;
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    flushBatch();
+  }, BATCH_FLUSH_INTERVAL_MS);
+}
+
+function flushBatch() {
+  if (pendingQueue.length === 0) return;
+  const toAdd = pendingQueue.splice(0, pendingQueue.length);
+
+  logRecords.update((list) => {
+    const combined = [...list, ...toAdd];
+    if (combined.length > MAX_RECORDS) {
+      const trimmed = combined.slice(combined.length - MAX_RECORDS);
+      // Prune seenKeys cache periodically to avoid memory leak
+      if (seenKeys.size > MAX_RECORDS * 2) {
+        seenKeys.clear();
+        for (const r of trimmed) {
+          seenKeys.add(`${r.source}:${r.id}`);
+        }
+      }
+      return trimmed;
+    }
+    return combined;
+  });
 }
 
 function push(record: LogRecord) {
   if (isNoisy(record.message)) return;
-  logRecords.update((list) => {
-    const next = [...list, record];
-    return next.length > MAX_RECORDS ? next.slice(next.length - MAX_RECORDS) : next;
-  });
+  if (get(logStreamPaused)) return;
+
+  const key = `${record.source}:${record.id}`;
+  if (seenKeys.has(key)) return;
+  seenKeys.add(key);
+
+  pendingQueue.push(record);
+  scheduleFlush();
 }
 
-/** Normalise anything (Error, object, string) into a readable message. */
 function stringify(value: unknown): string {
   if (value === null || value === undefined) return String(value);
-  if (typeof value === "string") return value;
-  if (value instanceof Error) return value.name + ": " + value.message;
+  if (typeof value === 'string') return value;
+  if (value instanceof Error) return value.name + ': ' + value.message;
   try {
     return JSON.stringify(value);
   } catch {
@@ -70,8 +112,8 @@ function stringify(value: unknown): string {
   }
 }
 
-/** Write a frontend-originated record into the log bus. */
-export function logFrontend(level: string, message: string, category = "frontend") {
+export function logFrontend(level: string, message: string, category = 'frontend') {
+  if (isLogging) return;
   frontendSeq += 1;
   const record: LogRecord = {
     id: -frontendSeq,
@@ -79,25 +121,24 @@ export function logFrontend(level: string, message: string, category = "frontend
     level,
     category,
     message,
-    source: "frontend"
+    source: 'frontend'
   };
   push(record);
   return record;
 }
 
 export const log = {
-  debug: (m: string, c = "frontend") => logFrontend("Debug", m, c),
-  info: (m: string, c = "frontend") => logFrontend("Information", m, c),
-  warn: (m: string, c = "frontend") => logFrontend("Warning", m, c),
-  error: (m: string, c = "frontend") => logFrontend("Error", m, c)
+  debug: (m: string, c = 'frontend') => logFrontend('Debug', m, c),
+  info: (m: string, c = 'frontend') => logFrontend('Information', m, c),
+  warn: (m: string, c = 'frontend') => logFrontend('Warning', m, c),
+  error: (m: string, c = 'frontend') => logFrontend('Error', m, c)
 };
 
 /**
- * Mirror browser console output + uncaught errors into the log bus.
- * Idempotent - safe to call from every page load.
+ * Mirror browser console output with strict reentrancy protection
  */
 export function captureConsole() {
-  if (consoleCaptured || typeof window === "undefined") return;
+  if (consoleCaptured || typeof window === 'undefined') return;
   consoleCaptured = true;
 
   const original = {
@@ -107,138 +148,134 @@ export function captureConsole() {
     error: console.error.bind(console)
   };
 
+  function safeLog(level: string, args: unknown[]) {
+    if (isLogging || !get(consoleCaptureEnabled)) return;
+    isLogging = true;
+    try {
+      const text = args.map(stringify).join(' ');
+      if (!isNoisy(text)) {
+        logFrontend(level, text, 'browser-console');
+      }
+    } finally {
+      isLogging = false;
+    }
+  }
+
   console.log = (...args: unknown[]) => {
     original.log(...args);
-    logFrontend("Information", args.map(stringify).join(" "));
+    safeLog('Information', args);
   };
   console.info = (...args: unknown[]) => {
     original.info(...args);
-    logFrontend("Information", args.map(stringify).join(" "));
+    safeLog('Information', args);
   };
   console.warn = (...args: unknown[]) => {
     original.warn(...args);
-    logFrontend("Warning", args.map(stringify).join(" "));
+    safeLog('Warning', args);
   };
   console.error = (...args: unknown[]) => {
     original.error(...args);
-    logFrontend("Error", args.map(stringify).join(" "));
+    safeLog('Error', args);
   };
 
-  window.addEventListener("error", (event) => {
-    logFrontend("Error", "Uncaught: " + event.message + " (" + event.filename + ":" + event.lineno + ")", "window");
+  window.addEventListener('error', (event) => {
+    if (!get(consoleCaptureEnabled)) return;
+    safeLog('Error', [
+      `Uncaught: ${event.message} (${event.filename || 'unknown'}:${event.lineno || 0})`
+    ]);
   });
 
-  window.addEventListener("unhandledrejection", (event) => {
-    logFrontend("Error", "Unhandled promise rejection: " + stringify(event.reason), "window");
+  window.addEventListener('unhandledrejection', (event) => {
+    if (!get(consoleCaptureEnabled)) return;
+    safeLog('Error', ['Unhandled promise rejection: ' + stringify(event.reason)]);
   });
-
-  logFrontend("Information", "Frontend log capture started", "logs");
 }
 
 /**
- * Start SSE streaming from the backend log buffer.
- * Pushes all backend entries into the shared logRecords store.
- * Falls back to polling if the server sends an error or disconnects.
+ * Start SSE streaming from the backend log buffer with batching
  */
 export function startLogStream() {
-  if (typeof window === "undefined") return;
-  if (eventSource) return; // already connected
+  if (typeof window === 'undefined') return;
+  if (eventSource) return;
 
-  eventSource = new EventSource("/api/logs/stream");
+  try {
+    eventSource = new EventSource('/api/logs/stream');
 
-  eventSource.addEventListener("open", () => {
-    logStreaming.set(true);
-    logStreamError.set("");
-  });
+    eventSource.onopen = () => {
+      logStreaming.set(true);
+      logStreamError.set('');
+    };
 
-  // The backend sends named SSE events: "event: log\ndata: {json}\n\n"
-  eventSource.addEventListener("log", (e: MessageEvent) => {
-    try {
-      const entry = JSON.parse(e.data);
-      push({
-        id: entry.id,
-        timestamp: entry.timestamp,
-        level: entry.level,
-        category: entry.category,
-        message: entry.message,
-        exception: entry.exception ?? null,
-        source: "backend"
-      } as LogRecord);
-      if (entry.id > backendCursor) backendCursor = entry.id;
-    } catch {
-      // ignore malformed frames
-    }
-  });
+    eventSource.addEventListener('log', (e: MessageEvent) => {
+      try {
+        const entry = JSON.parse(e.data);
+        if (entry && entry.id !== undefined) {
+          push({
+            id: entry.id,
+            timestamp: entry.timestamp || new Date().toISOString(),
+            level: entry.level || 'Information',
+            category: entry.category || 'Backend',
+            message: entry.message || '',
+            exception: entry.exception ?? null,
+            source: 'backend'
+          });
+          if (entry.id > backendCursor) backendCursor = entry.id;
+        }
+      } catch {
+        // ignore parse error
+      }
+    });
 
-  eventSource.addEventListener("error", () => {
-    if (eventSource) {
-      eventSource.close();
-      eventSource = null;
-    }
-    logStreaming.set(false);
-
-    // Fall back to polling after a brief delay
-    reconnectTimer = setTimeout(() => {
+    eventSource.onerror = () => {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      logStreaming.set(false);
       fallbackToPolling();
-    }, RECONNECT_DELAY_MS);
-  });
+    };
+  } catch {
+    fallbackToPolling();
+  }
 }
 
-/**
- * Polling fallback for when SSE is unavailable (e.g., behind a proxy that
- * buffers responses). Fetches /api/logs?sinceId=... and merges new entries
- * into the shared logRecords store.
- */
 function fallbackToPolling() {
-  if (typeof window === "undefined" || pollTimer) return;
-
-  logFrontend("Warning", "SSE unavailable, falling back to polling", "logs");
+  if (typeof window === 'undefined' || pollTimer) return;
 
   const tick = async () => {
+    if (get(logStreamPaused)) return;
     try {
-      const res = await fetch("/api/logs?sinceId=" + backendCursor + "&limit=200");
-      if (!res.ok) {
-        logStreamError.set("Backend returned " + res.status);
-        return;
-      }
+      const res = await fetch(`/api/logs?sinceId=${backendCursor}&limit=80`);
+      if (!res.ok) return;
       const payload = await res.json();
       const entries = Array.isArray(payload.logs) ? payload.logs : [];
-
       for (const entry of entries) {
         push({
           id: entry.id,
           timestamp: entry.timestamp,
-          level: entry.level,
-          category: entry.category,
-          message: entry.message,
+          level: entry.level || 'Information',
+          category: entry.category || 'Backend',
+          message: entry.message || '',
           exception: entry.exception ?? null,
-          source: "backend"
-        } as LogRecord);
+          source: 'backend'
+        });
         if (entry.id > backendCursor) backendCursor = entry.id;
       }
-
       logStreaming.set(true);
-      logStreamError.set("");
-    } catch (e) {
+      logStreamError.set('');
+    } catch {
       logStreaming.set(false);
-      logStreamError.set(stringify(e));
     }
   };
 
   pollTimer = setInterval(tick, POLL_INTERVAL_MS);
   void tick();
-  logStreaming.set(true);
 }
 
-/** Stop SSE streaming and/or polling. */
 export function stopLogStream() {
   if (eventSource) {
     eventSource.close();
     eventSource = null;
-  }
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
   }
   if (pollTimer) {
     clearInterval(pollTimer);
@@ -247,26 +284,23 @@ export function stopLogStream() {
   logStreaming.set(false);
 }
 
-/** Clear both the local list and the backend buffer. */
+export function togglePauseStream() {
+  logStreamPaused.update((p) => !p);
+}
+
 export async function clearLogs() {
+  pendingQueue = [];
+  seenKeys.clear();
   logRecords.set([]);
   backendCursor = 0;
   frontendSeq = 0;
-
   try {
-    const res = await fetch("/api/logs", { method: "DELETE" });
-    if (!res.ok) logStreamError.set("Clear failed: " + res.status);
-  } catch (e) {
-    logStreamError.set(stringify(e));
+    await fetch('/api/logs', { method: 'DELETE' });
+  } catch {
+    // ignore
   }
-
-  logFrontend("Information", "Log buffer cleared", "logs");
 }
 
-/** Current snapshot without subscribing (handy inside components). */
 export function currentLogs(): LogRecord[] {
   return get(logRecords);
 }
-
-
-

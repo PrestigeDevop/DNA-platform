@@ -4,42 +4,42 @@ Repository-specific guidance for agents working on the DNA Platform.
 
 ## Layout
 
-- `src/01_Core/DNAPlatform.Core` — **empty placeholder** (`Class1.cs` only). Do
+- `src/01_Core/DNAPlatform.Core` ï¿½ **empty placeholder** (`Class1.cs` only). Do
   not add domain types here; nothing is wired up.
-- `src/03_AgentWorkflowPatterns/DNAPlatform.AgentFramework` — the **single**
+- `src/03_AgentWorkflowPatterns/DNAPlatform.AgentFramework` ï¿½ the **single**
   workflow/agent engine (`WorkflowOrchestrator`, `AgentManager`, `NodeExecutor`).
   The DevUI API, the ConsoleApp demo and the AGUI server all bind this one
   instance; there is no second orchestrator anywhere in the repo.
-- `src/05_DevUI/DNAPlatform.DevUI.API` — ASP.NET Core 8 backend (port 5254).
+- `src/05_DevUI/DNAPlatform.DevUI.API` ï¿½ ASP.NET Core 8 backend (port 5254).
   `Program.cs` holds DI registration + Minimal APIs, `Controllers/` holds the
   attribute-routed endpoints, `Services/` holds `MiseService`, `LogStore` and
   `SkillBackedNodeExecutor` (the bridge from a workflow node to the real skill
   registry).
-- `src/05_DevUI/DNAPlatform.DevUI.Web` — SvelteKit frontend (port 5173).
+- `src/05_DevUI/DNAPlatform.DevUI.Web` ï¿½ SvelteKit frontend (port 5173).
   Prisma schema is at `src/05_DevUI/DNAPlatform.DevUI.Web/prisma/schema.prisma`.
-- `src/06_Skills` — skill registry (`DNAPlatform.Skills` + `DNAPlatform.Skills.Core`).
+- `src/06_Skills` ï¿½ skill registry (`DNAPlatform.Skills` + `DNAPlatform.Skills.Core`).
   The API consumes the real registry directly; the old
   `AgentFrameworkStubs.cs` shim is **deleted**.
-- `src/07_CLI/DNAPlatform.Cli` — `dnaplatform`, an HTTP-only CLI client. See
+- `src/07_CLI/DNAPlatform.Cli` ï¿½ `dnaplatform`, an HTTP-only CLI client. See
   the CLI section below.
-- `src/08_ACP` — **ACP adapter** (Node/TypeScript, standalone). Maps ACP methods
+- `src/08_ACP` ï¿½ **ACP adapter** (Node/TypeScript, standalone). Maps ACP methods
   to HTTP calls to the .NET backend at :5254. Own `package.json`; not a dependency
   of DevUI.Web.
-- `src/09_Tests/DNAPlatform.Tests` — xUnit tests for the orchestrator
+- `src/09_Tests/DNAPlatform.Tests` ï¿½ xUnit tests for the orchestrator
   (8 tests). `dotnet test` is the only automated gate; the frontend has none.
-- `scripts/` — `bootstrap.ps1` (one-time setup) and `test-e2e.ps1` (three-stage
+- `scripts/` ï¿½ `bootstrap.ps1` (one-time setup) and `test-e2e.ps1` (three-stage
   verification with a real exit code). Both are PowerShell 5.1 only and both have
   a confirmed green run. `verify-stack.bat` at the repo root is kept and still
   works; it is interactive and has no exit code, so `test-e2e.ps1` is the one to
   gate a build on.
 - `docs/refactor.md` is the user-supplied spec (an input artifact, **aspirational**,
   not a description of current reality) and `docs/AGENT_FRAMEWORK_INTEGRATION.md`
-  is the Microsoft Agent Framework decision record — deferred, seam first.
+  is the Microsoft Agent Framework decision record ï¿½ deferred, seam first.
   `docs/GAP_ANALYSIS.md` assesses both against the code.
 
 ## Toolchain
 
-- .NET 8 SDK (target framework is `net8.0`, not .NET 10 — some docs are stale).
+- .NET 8 SDK (target framework is `net8.0`, not .NET 10 ï¿½ some docs are stale).
 - Node 20+ / npm.
 - On Debian, ICU is often missing; export
   `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` before running `dotnet`.
@@ -51,7 +51,7 @@ Repository-specific guidance for agents working on the DNA Platform.
 # prisma db push. Idempotent. Run this before run-all.bat on a fresh clone.
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1
 
-# Backend — --no-launch-profile and --urls are mandatory (see Gotchas)
+# Backend ï¿½ --no-launch-profile and --urls are mandatory (see Gotchas)
 dotnet build DNAPlatform.sln
 cd src/05_DevUI/DNAPlatform.DevUI.API
 dotnet run --no-launch-profile --urls http://127.0.0.1:5254
@@ -62,7 +62,7 @@ npm install
 npx prisma db push          # requires DATABASE_URL (see .env); rerun after schema edits
 npm run dev                 # port 5173
 
-# Verification — additive to verify-stack.bat, which it leaves in place
+# Verification ï¿½ additive to verify-stack.bat, which it leaves in place
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-e2e.ps1
 ```
 
@@ -96,7 +96,7 @@ Two easy-to-confuse points:
   (handled by SvelteKit) are **different endpoints**. Only the first appears in
   `vite.config.ts`.
 - The `WorkflowsController` / `AgentsController` list endpoints are **dead in
-  dev** — SvelteKit shadows those paths, so browser traffic never reaches them.
+  dev** ï¿½ SvelteKit shadows those paths, so browser traffic never reaches them.
   Changes there are invisible from the UI and only matter when calling `:5254`
   directly.
 
@@ -143,7 +143,7 @@ the SvelteKit convention. Error bodies are `{ error }` on SvelteKit and
 - **HTTP only.** No `ProjectReference` to `DNAPlatform.AgentFramework` and it
   never constructs a `WorkflowOrchestrator`. It asks the platform to run things.
   Adding a project reference would reintroduce the second-engine split that
-  `docs/refactor.md` §15 forbids.
+  `docs/refactor.md` ï¿½15 forbids.
 - **It needs two base URLs.** `--url` (default `DNA_PLATFORM_URL`, then
   `http://127.0.0.1:5173`) is the DevUI origin and serves `/api/workflows`,
   `/api/executions`, `/api/snippets` and `/api/logs`. `--api-url` (default
@@ -158,12 +158,12 @@ the SvelteKit convention. Error bodies are `{ error }` on SvelteKit and
 
 ## ACP adapter
 
-`src/08_ACP` — standalone Node/TypeScript project using `@agentclientprotocol/sdk`
+`src/08_ACP` ï¿½ standalone Node/TypeScript project using `@agentclientprotocol/sdk`
 (Apache-2.0, Zed Industries). Own `package.json`; **not** added to DevUI.Web deps.
 
 **Transport rules (non-negotiable):**
 - stdin = client?agent JSON-RPC frames (newline-delimited)
-- stdout = agent?client JSON-RPC frames — **stdout must stay PROTOCOL-PURE**
+- stdout = agent?client JSON-RPC frames ï¿½ **stdout must stay PROTOCOL-PURE**
 - ALL diagnostics (console.log, errors, warnings) go to stderr
 - A stray `console.log` on stdout corrupts the stream
 
@@ -171,7 +171,7 @@ the SvelteKit convention. Error bodies are `{ error }` on SvelteKit and
 - `initialize` ? no HTTP call; responds with agent capabilities (`promptCapabilities.text=true`, no session lifecycle methods)
 - `session/new` ? `GET /api/info` health check; returns `{ sessionId }` on success, JSON-RPC error `-32603` if backend down
 - `session/prompt` ? `POST /api/workflows/execute` with workflow JSON from the prompt's text content block; returns `{ stopReason: "end_turn" }` on success, `{ stopReason: "refusal" }` on failure
-- `session/cancel` ? notification only (no response); logs and returns — ad-hoc execute has no persisted execution ID to cancel
+- `session/cancel` ? notification only (no response); logs and returns ï¿½ ad-hoc execute has no persisted execution ID to cancel
 
 **Run:**
 ```bash
@@ -188,7 +188,7 @@ npm run smoke        # pipes a real session, asserts valid JSON-RPC on stdout
 ```
 
 **Environment variable:**
-- `DNA_PLATFORM_API_URL` — default `http://127.0.0.1:5254`
+- `DNA_PLATFORM_API_URL` ï¿½ default `http://127.0.0.1:5254`
 
 ## Persistence constraints
 
@@ -198,7 +198,7 @@ npm run smoke        # pipes a real session, asserts valid JSON-RPC on stdout
   `String` and must be `JSON.parse`d in the route handler.
 - Models: `Workflow`, `Agent`, `Execution`, `CustomSnippet`, `WorkflowVersion`.
   `Execution.workflowId` is a nullable FK with `onDelete: SetNull`.
-- Node `x`/`y` positions live inside the `nodes` JSON blob — there is no
+- Node `x`/`y` positions live inside the `nodes` JSON blob ï¿½ there is no
   separate column.
 - `Execution.duration` is an integer column of milliseconds, and
   `parseDurationMs` rounds to it. Any run under 1 ms stores `0`. See
@@ -220,7 +220,7 @@ npm run smoke        # pipes a real session, asserts valid JSON-RPC on stdout
   (`{ workflowId, nodeResults: [] }`) and derives each node's chip from it; a node
   the engine never reported stays `Pending` rather than being given a state.
   Render per-node status with colour **+ icon + literal word**, never colour
-  alone. Guard with `(nodes || [])` — `Workflow.Nodes` is expected to become
+  alone. Guard with `(nodes || [])` ï¿½ `Workflow.Nodes` is expected to become
   non-nullable, and a null today would throw inside the reactive block.
 - Connection editing: click a source port to arm (`pendingFrom`), click a target
   port to commit, click the canvas to cancel. Edges are SVG `<path>`s between node
@@ -228,7 +228,7 @@ npm run smoke        # pipes a real session, asserts valid JSON-RPC on stdout
   click so the thin curve stays visible.
 - Test step: `WorkflowTestResult.svelte` renders
   `POST /api/workflows/validate`. It is labelled **structural only** and must not
-  grow a speculative validation engine (`docs/refactor.md` §4).
+  grow a speculative validation engine (`docs/refactor.md` ï¿½4).
 - Logs console: `/logs`, backed by `src/lib/services/logs.ts` (merges frontend
   console capture with the backend buffer).
 - Pages: `/`, `/workflows`, `/skills`, `/agents`, `/executions`, `/logs`, `/about`.
@@ -260,7 +260,7 @@ Prisma route, the proxied routes, and `dnaplatform validate` / `status`. Both
 servers are stopped afterwards; a leaked :5254 breaks the next build and a leaked
 :5173 breaks the next `prisma generate`.
 
-`npm run check` is **red on arrival** — 6 errors and 17 warnings in 7 files. The
+`npm run check` is **red on arrival** ï¿½ 6 errors and 17 warnings in 7 files. The
 e2e script fails only on a *new* diagnostic, so treat a rise in those numbers as
 a real regression.
 
@@ -291,7 +291,7 @@ parsing together.
   `taskkill /T /F /PID` on the wrapper.
 - Do **not** add a Minimal API mapping for `/api/logs`. `LogsController` already
   owns that route, and two handlers for one route throw
-  `AmbiguousMatchException` at request time — see the warning in `Program.cs`.
+  `AmbiguousMatchException` at request time ï¿½ see the warning in `Program.cs`.
 - Several files under `docs/` are stale relative to the code. When they disagree
   with the source, trust the source: `Program.cs`, `vite.config.ts`,
   `schema.prisma`, and the `+server.ts` route handlers.
@@ -299,7 +299,7 @@ parsing together.
 ## Mise
 
 - `mise.toml` at the repo root pins the two platform-provided defaults and nothing else:
-  `dotnet = "8"` and `node = "lts"` (refactor.md §4, lines 154-159). It also sets
+  `dotnet = "8"` and `node = "lts"` (refactor.md ï¿½4, lines 154-159). It also sets
   `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` and defines the `build`, `build:web`, and
   `dev` tasks. Task names containing `:` must be quoted (`[tasks."build:web"]`).
 - `MiseService` (`Services/MiseService.cs`) is the only thing that talks to mise. It
@@ -308,11 +308,11 @@ parsing together.
   reasons. `EnvironmentController` owns `/api/environment`; do not add Minimal API
   mappings for those routes.
 - Commands depended on, and their exit-code contract:
-  - `mise --version` — exit 0 means available; anything else is treated as "not installed".
-  - `mise --cd <root> ls --json` — exit 0 with JSON keyed by tool name. Each entry may
+  - `mise --version` ï¿½ exit 0 means available; anything else is treated as "not installed".
+  - `mise --cd <root> ls --json` ï¿½ exit 0 with JSON keyed by tool name. Each entry may
     carry `version`, `install_path`, `installed`, `active`, `source`. An entry is only
     considered usable when `active && installed`; missing fields degrade, never throw.
-  - `mise --cd <root> tasks ls --json` — exit 0 with an array of `{ name, description }`.
+  - `mise --cd <root> tasks ls --json` ï¿½ exit 0 with an array of `{ name, description }`.
   - Any nonzero exit code, unparsable stdout, or timeout yields an empty result rather
     than an error, which downgrades the affected runtimes to `yellow`/`red`.
 - Status semantics: GREEN = requested tool+version resolves and is installed/active;
@@ -323,7 +323,7 @@ parsing together.
 
 `mise mcp` is an **EXPERIMENTAL** Model Context Protocol server over stdio. It requires
 `MISE_EXPERIMENTAL=1` and refuses to start without it. `IMiseService` shells out to the
-mise CLI directly — nothing in this repo launches or speaks to `mise mcp`.
+mise CLI directly ï¿½ nothing in this repo launches or speaks to `mise mcp`.
 
 Client configuration shape:
 
@@ -343,9 +343,9 @@ Resources: `mise://tools` (add `?include_inactive=true` for other installed vers
 `mise://tasks`, `mise://env`, `mise://config`.
 
 Tools:
-- `list_commands` — every mise command with its declared effect.
-- `run_task` — works. Runs a project task with the user's full account permissions.
-- `install_tool` — advertised but currently returns "not yet implemented". Install with
+- `list_commands` ï¿½ every mise command with its declared effect.
+- `run_task` ï¿½ works. Runs a project task with the user's full account permissions.
+- `install_tool` ï¿½ advertised but currently returns "not yet implemented". Install with
   `mise install` outside MCP instead.
 
 **SECURITY.** `mise://env` returns real resolved values including secrets, and

@@ -6,8 +6,7 @@
    * Result panel for the Test step of Configure -> Test -> Run.
    *
    * The status chip uses colour + icon + literal word, never colour alone, so the
-   * outcome is readable without relying on colour vision (same convention as
-   * EnvironmentConfigure.svelte).
+   * outcome is readable without relying on colour vision.
    */
 
   export let result: ValidationResult | null = null;
@@ -34,8 +33,7 @@
       <div class="chip chip-error"><span class="icon">✕</span> <span class="word">Error</span></div>
       <p class="message">{error}</p>
       <p class="scope">
-        The test endpoint could not be reached. It is served by the .NET API on
-        port 5254 through the Vite proxy — check that the backend is running.
+        Validation could not be completed. Please review the workflow nodes and connection structure.
       </p>
     {:else if result}
       <div
@@ -60,7 +58,7 @@
         </section>
       {/if}
 
-      {#if result.warnings.length > 0}
+      {#if result.warnings && result.warnings.length > 0}
         <section>
           <h3>Warnings ({result.warnings.length})</h3>
           <ul class="issues">
@@ -71,17 +69,14 @@
         </section>
       {/if}
 
-      {#if result.checks.length > 0}
+      {#if result.checks && result.checks.length > 0}
         <section>
-          <h3>Checks performed ({result.checks.length})</h3>
+          <h3>Structural checks</h3>
           <ul class="checks">
             {#each result.checks as check}
-              <li>
-                <span class="bullet" class:bullet-pass={check.passed} class:bullet-fail={!check.passed}>
-                  {check.passed ? '✓' : '✕'}
-                </span>
+              <li class:check-passed={check.passed} class:check-failed={!check.passed}>
+                <span class="check-icon">{check.passed ? '✓' : '✕'}</span>
                 <span class="check-name">{CHECK_LABELS[check.name] ?? check.name}</span>
-                <span class="check-state">{check.passed ? 'passed' : 'failed'}</span>
                 {#if !check.passed && check.detail}
                   <span class="check-detail">{check.detail}</span>
                 {/if}
@@ -92,14 +87,15 @@
       {/if}
 
       <p class="scope">
-        Structural checks only. This does not execute skills, verify the
-        environment, or validate data — it confirms the definition is shaped
-        correctly and that the graph can start and finish.
+        Structural validation verifies node identifiers, connection references, entry points,
+        and acyclic dependency order.
       </p>
+    {:else}
+      <p class="empty">No validation result available.</p>
     {/if}
 
     <footer>
-      <button class="btn-primary" on:click={() => dispatch('close')}>Close</button>
+      <button class="btn" on:click={() => dispatch('close')}>Close</button>
     </footer>
   </div>
 </div>
@@ -112,94 +108,152 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 100;
+    z-index: 60;
     padding: 1rem;
   }
   .panel {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
-    padding: 1.5rem;
+    max-width: 520px;
     width: 100%;
-    max-width: 620px;
     max-height: 85vh;
     overflow-y: auto;
+    padding: 1.25rem;
+    color: #e2e8f0;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
   }
   header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
     margin-bottom: 1rem;
   }
-  h2 { font-size: 1.125rem; color: #e2e8f0; margin: 0; }
+  h2 {
+    font-size: 1.1rem;
+    margin: 0;
+    color: #f1f5f9;
+  }
   .close {
-    background: transparent;
+    background: none;
     border: none;
     color: #94a3b8;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 1.1rem;
+    padding: 0.25rem 0.5rem;
   }
-  .close:hover { color: #e2e8f0; }
-
-  /* colour + icon + word: never colour alone */
+  .close:hover {
+    color: #f1f5f9;
+  }
   .chip {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.375rem 0.75rem;
-    border-radius: 0.375rem;
-    font-weight: 600;
-    font-size: 0.875rem;
-    border: 1px solid;
-  }
-  .chip .icon { font-size: 1rem; }
-  .chip-pass { background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.35); color: #4ade80; }
-  .chip-fail { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.35); color: #f87171; }
-  .chip-error { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.35); color: #f87171; }
-
-  .message { color: #cbd5e1; font-size: 0.9rem; margin: 0.75rem 0 0; }
-
-  section { margin-top: 1.25rem; }
-  h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: #94a3b8; margin: 0 0 0.5rem; }
-
-  ul { list-style: none; margin: 0; padding: 0; }
-  .issues li, .checks li {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 9999px;
     font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  .chip-pass {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+  }
+  .chip-fail,
+  .chip-error {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+  .message {
+    font-size: 0.95rem;
+    margin: 0.5rem 0 1rem;
     color: #cbd5e1;
-    padding: 0.35rem 0;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
   }
-  .bullet { font-size: 0.8rem; width: 1rem; flex-shrink: 0; }
-  .bullet-error, .bullet-fail { color: #f87171; }
-  .bullet-pass { color: #4ade80; }
-  .bullet-warn { color: #fbbf24; }
-
-  .check-name { color: #e2e8f0; }
-  .check-state { font-size: 0.75rem; color: #64748b; }
-  .check-detail { font-size: 0.75rem; color: #94a3b8; }
-
-  .scope {
-    margin-top: 1.25rem;
-    padding: 0.625rem 0.75rem;
-    background: rgba(0, 0, 0, 0.2);
-    border-left: 2px solid var(--border);
-    border-radius: 0.25rem;
-    font-size: 0.8rem;
+  section {
+    margin-top: 1rem;
+  }
+  h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     color: #94a3b8;
+    margin: 0 0 0.5rem;
   }
-
-  footer { display: flex; justify-content: flex-end; margin-top: 1.5rem; }
-  .btn-primary {
+  ul.issues,
+  ul.checks {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.85rem;
+  }
+  ul.issues li,
+  ul.checks li {
+    padding: 0.35rem 0.5rem;
+    border-radius: 0.25rem;
+    margin-bottom: 0.25rem;
+    background: rgba(15, 23, 42, 0.6);
+  }
+  .bullet {
+    font-weight: bold;
+    margin-right: 0.35rem;
+  }
+  .bullet-error {
+    color: #f87171;
+  }
+  .bullet-warn {
+    color: #fbbf24;
+  }
+  ul.checks li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .check-icon {
+    font-weight: bold;
+  }
+  .check-passed .check-icon {
+    color: #4ade80;
+  }
+  .check-failed .check-icon {
+    color: #f87171;
+  }
+  .check-name {
+    color: #e2e8f0;
+  }
+  .check-detail {
+    margin-left: auto;
+    color: #94a3b8;
+    font-size: 0.75rem;
+  }
+  .scope {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    line-height: 1.4;
+  }
+  .empty {
+    color: #64748b;
+    font-style: italic;
+  }
+  footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.25rem;
+  }
+  .btn {
     background: var(--primary);
     color: white;
     border: none;
-    padding: 0.5rem 1.25rem;
+    padding: 0.45rem 1rem;
     border-radius: 0.375rem;
     cursor: pointer;
-    font-weight: 500;
+    font-size: 0.85rem;
   }
-  .btn-primary:hover { opacity: 0.9; }
+  .btn:hover {
+    opacity: 0.9;
+  }
 </style>

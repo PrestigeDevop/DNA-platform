@@ -1,30 +1,47 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { logStore } from '$lib/server/logStore';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:5254';
-
-// GET /api/logs — proxy the backend in-memory log buffer.
+// GET /api/logs — returns in-memory logs
 export const GET: RequestHandler = async ({ url }) => {
-  const sinceId = url.searchParams.get('sinceId') ?? '0';
-  const limit = url.searchParams.get('limit') ?? '200';
+  const sinceId = parseInt(url.searchParams.get('sinceId') ?? '0', 10);
+  const limit = parseInt(url.searchParams.get('limit') ?? '500', 10);
+
+  const entries = logStore.get(isNaN(sinceId) ? 0 : sinceId, isNaN(limit) ? 500 : limit);
+
+  return json({
+    count: entries.length,
+    totalBuffered: logStore.count,
+    lastId: entries.length > 0 ? entries[entries.length - 1].id : sinceId,
+    logs: entries
+  });
+};
+
+// POST /api/logs — frontend log forwarding
+export const POST: RequestHandler = async ({ request }) => {
   try {
-    const res = await fetch(`${BACKEND_URL}/api/logs?sinceId=${sinceId}&limit=${limit}`);
-    const data = await res.json();
-    return json(data, { status: res.status });
+    const body = await request.json();
+    if (!body || !body.message) {
+      return json({ success: false, error: "A non-empty 'message' is required." }, { status: 400 });
+    }
+
+    const entry = logStore.add({
+      timestamp: body.timestamp || new Date().toISOString(),
+      level: body.level || 'Information',
+      category: body.category || 'Frontend',
+      message: body.message,
+      exception: body.exception || null,
+      source: 'frontend'
+    });
+
+    return json({ success: true, id: entry.id });
   } catch (error) {
-    console.error('Error fetching logs:', error);
-    return json({ error: 'Failed to fetch logs' }, { status: 502 });
+    return json({ success: false, error: 'Failed to record log entry' }, { status: 500 });
   }
 };
 
-// DELETE /api/logs — clear the backend log buffer.
+// DELETE /api/logs — clear logs
 export const DELETE: RequestHandler = async () => {
-  try {
-    const res = await fetch(`${BACKEND_URL}/api/logs`, { method: 'DELETE' });
-    const data = await res.json();
-    return json(data, { status: res.status });
-  } catch (error) {
-    console.error('Error clearing logs:', error);
-    return json({ error: 'Failed to clear logs' }, { status: 502 });
-  }
+  const removed = logStore.clear();
+  return json({ success: true, removed });
 };
