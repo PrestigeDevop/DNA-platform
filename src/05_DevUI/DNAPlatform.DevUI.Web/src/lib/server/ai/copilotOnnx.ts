@@ -100,6 +100,17 @@ export class CopilotOnnxEngine {
   /**
    * Run local inference with Microsoft Copilot reasoning and ONNX Runtime tensor execution
    */
+  async runInference(options: any): Promise<CopilotInferenceResult> {
+    return this.generate({
+      model: options.model,
+      systemPrompt: options.systemPrompt,
+      userPrompt: options.userPrompt || options.prompt || '',
+      temperature: options.temperature,
+      maxTokens: options.maxTokens,
+      availableTools: options.availableTools || options.toolsToExecute || []
+    });
+  }
+
   async generate(options: CopilotInferenceOptions): Promise<CopilotInferenceResult> {
     const startTime = Date.now();
     const model = options.model || CopilotOnnxEngine.defaultModel;

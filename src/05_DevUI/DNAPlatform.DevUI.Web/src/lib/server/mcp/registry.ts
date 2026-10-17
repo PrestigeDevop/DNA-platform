@@ -433,6 +433,10 @@ class McpRegistry {
 
     return await server.executeTool(toolName, args);
   }
+
+  async executeTool(serverId: string, toolName: string, args: Record<string, any>): Promise<any> {
+    return this.callTool(serverId, toolName, args);
+  }
 }
 
 const globalForMcp = globalThis as unknown as {

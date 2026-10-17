@@ -9,6 +9,11 @@
   "scripts": {
     "dev": "npm run dev --workspace=src/05_DevUI/DNAPlatform.DevUI.Web",
     "build": "npm run build --workspace=src/05_DevUI/DNAPlatform.DevUI.Web",
-    "preview": "npm run preview --workspace=src/05_DevUI/DNAPlatform.DevUI.Web"
+    "preview": "npm run preview --workspace=src/05_DevUI/DNAPlatform.DevUI.Web",
+    "cli": "node ./scripts/dna.js",
+    "tui": "node ./scripts/dna.js tui",
+    "smoketest": "node ./scripts/dna.js smoketest",
+    "bootstrap": "node ./scripts/dna.js bootstrap",
+    "clean": "node ./scripts/dna.js clean"
   }
 }

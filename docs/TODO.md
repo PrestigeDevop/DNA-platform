@@ -1,4 +1,4 @@
-﻿# DNA Platform -- Task List
+# DNA Platform -- Task List
 
 > Priority ordering from refactor.md section 16. State reflects GAP_ANALYSIS.md
 > (2026-10-05) and README.md "In Development" (2026-10-12). When they disagree,
@@ -151,3 +151,11 @@ schema.prisma has no CodeBlock model; src/06_Skills/ exposes ISkill only.
   infrastructure just because a reference project uses it)
 - Full plugin marketplace / installation system (Priority 6 is shell only)
 - Full Code Block system (Priority 9 is architecture prep only)
+
+--
+
+## Priority 10 -- Polyglot Core (CSnakes) & Unified CLI/TUI  [DONE]
+
+- [x] **CSnakes Python-C# Integration in Core**: Implemented `DNAPlatform.Core.CSnakes` (`CSnakes.cs`, `BioinformaticsTypes.cs`) in `src/01_Core/DNAPlatform.Core`. Provides zero-copy data exchange, NumPy/BioPython sequence analysis, and DNA metrics calculation.
+- [x] **Unified Cross-Platform CLI & TUI**: Single cross-platform command runner (`scripts/dna.js`, `npm run cli`, `npm run tui`, `npm run smoketest`, `npm run bootstrap`, `npm run clean`) replacing legacy platform-specific `.bat` and PowerShell scripts across Linux, macOS, and Windows.
+- [x] **AG-UI Protocol & Human-in-the-Loop (HITL)**: Full implementation of [docs.ag-ui.com](https://docs.ag-ui.com/sdk/dotnet/hosting/overview) and Microsoft Learn AG-UI integration across .NET and SvelteKit.

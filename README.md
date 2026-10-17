@@ -35,29 +35,21 @@ DNA Platform enables bioinformaticians to:
 - **Loop constructs** for iteration
 - **Subworkflow references** for composition
 
-### 🤖 AI Agent Framework
-- **Provider-agnostic `IAgent` seam** — Microsoft Agent Framework assessed and
-  **deferred**; it will be added later as one provider among several, never as the
-  execution engine. See [docs/AGENT_FRAMEWORK_INTEGRATION.md](./docs/AGENT_FRAMEWORK_INTEGRATION.md)
-- **Local LLM inference** support (Ollama, LM Studio) — planned, not yet wired
-- **Tool calling** for skill invocation
-- **Reasoning traces** for interpretability (todo: unfied IO logs observability layer) 
+### 🤖 AI Agent Framework & AG-UI Hosting
+- **AG-UI Protocol Specification** ([docs.ag-ui.com](https://docs.ag-ui.com/sdk/dotnet/hosting/overview)): First-class Server-Sent Events (SSE) streaming server supporting `RUN_STARTED`, `THINKING_DELTA`, `TOOL_CALL_STARTED/FINISHED`, `STATE_SNAPSHOT`, `STATE_DELTA`, and `RUN_FINISHED`.
+- **Human-in-the-Loop (HITL) Interruption**: Sensitive actions (e.g. sequence mutation, pipeline dispatch) emit `APPROVAL_REQUESTED` interrupts, pausing execution until the human operator authorizes or rejects via the UI.
+- **Provider-agnostic `IAgent` seam** — Bound to `DNAPlatform.AgentFramework`, with Microsoft Agent Framework evaluated and decoupled behind a clean seam. See [docs/AGENT_FRAMEWORK_INTEGRATION.md](./docs/AGENT_FRAMEWORK_INTEGRATION.md).
+- **Microsoft Copilot Local Reasoning**: Local ONNX Runtime inference engine with tool calling and cognitive thinking traces.
 
 ### 🧩 Extensible Skill System
 - **Plugin architecture** for custom bioinformatic algorithms
-- **Built-in skills**: Data transform, Validation, Merge results
-- **Dynamic skill discovery** and registration (WIP)
-- - **Modular ** Modular  BCL and FCL scaffold any prewritten class into Boilerplate Code (stubs) 
-- **Input/output schema** validation
+- **Built-in skills**: Data transform, IUPAC Validation, Merge results, C# Clock (`current-time`), Pairwise Sequence Alignment (Needleman-Wunsch).
+- **C# & TypeScript Custom Skill Authoring**: Live code editor with interactive verification and AI annotation helper.
 
-### 🌐 Polyglot Runtime
-- **.NET polyglot kernel** for Jupyter notebooks
-- **Python interop** (pythonnet/PyO3)
-- **Node.js bridge** for JavaScript tools
-- **mise-based environment** — `mise.toml` pins the toolchain and the ⚙️ Configure view
-  reports GREEN/YELLOW/RED runtime status with export/import/verify (the core idea,
-  now implemented)
-- **pack drylab experiments** make abstract interactive webapps sort of  like hugging face's playground locally for now maybe "Distroless docker image"
+### 🌐 Polyglot Runtime & CSnakes in Core
+- **CSnakes Python-C# Interop in `DNAPlatform.Core`**: High-performance zero-copy bridge between Python and C#, supporting native Python module execution, NumPy arrays, BioPython sequence analysis, and DNA metrics computation.
+- **Interactive Polyglot Kernel**: Live multi-cell execution for C# .NET Interactive, Python 3, Node.js / TypeScript, and Bash.
+- **Unified Cross-Platform CLI & TUI**: Single cross-platform command runner (`npm run cli`, `npm run tui`, `npm run smoketest`, `npm run clean`) replacing legacy platform-specific scripts.
 
 
 ### 💻 DevUI - Web-Based Designer
@@ -80,24 +72,37 @@ DNA Platform enables bioinformaticians to:
   pinning and for the ⚙️ Configure view. The app runs without it.
 - **Git** (optional, for version control)
 
-### One-Command Setup
-```bash
-# 1. Once, on a fresh clone: install, build, generate the Prisma client, push the schema
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1
+### One-Command Setup (Cross-Platform)
 
-# 2. Every session
-run-all.bat
+```bash
+# 1. Once, on a fresh clone: toolchain probe, dependencies, and Prisma database initialization
+npm run bootstrap
+# or: node scripts/dna.js bootstrap
+
+# 2. Launch the interactive Cross-Platform Terminal User Interface (TUI)
+npm run tui
+# or: node scripts/dna.js tui
+
+# 3. Automated Cross-Platform Smoke Testing (replaces legacy e2e and .bat scripts)
+npm run smoketest
+# or: node scripts/dna.js smoketest
+
+# 4. Clean workspace artifacts, caches, and logs
+npm run clean
+# or: node scripts/dna.js clean
+
+# 5. Start dev server stack
+npm run dev
 ```
 
-This starts:
-- **Backend API**: http://localhost:5254 (Swagger: `/swagger`)
-- **Frontend DevUI**: http://localhost:5173
-
-`bootstrap.ps1` is idempotent, so re-running it is safe. It probes the toolchain,
-runs `dotnet restore` / `dotnet build`, `npm install`, `prisma generate` and
-`prisma db push`, and prints both URLs when it finishes.
+On Windows, double-clicking `run-all.bat`, `verify-stack.bat`, or `cleanup-folder.bat` now delegates seamlessly to the unified cross-platform runner `scripts/dna.js`.
 
 ### Verifying the stack
+The platform provides a comprehensive automated test gate:
+```bash
+npm run smoketest
+```
+It tests database connectivity, workflow structural validation, agent execution, skills registry, C# high-precision time providers, AG-UI protocol streaming with Human-in-the-Loop approval resumption, and the polyglot CSnakes kernel.
 
 ```bash
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-e2e.ps1

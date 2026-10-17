@@ -4,37 +4,39 @@ Repository-specific guidance for agents working on the DNA Platform.
 
 ## Layout
 
-- `src/01_Core/DNAPlatform.Core` � **empty placeholder** (`Class1.cs` only). Do
-  not add domain types here; nothing is wired up.
-- `src/03_AgentWorkflowPatterns/DNAPlatform.AgentFramework` � the **single**
+- `src/01_Core/DNAPlatform.Core` — **CSnakes Polyglot Python-C# Bridge**
+  (`CSnakes.cs`, `BioinformaticsTypes.cs`). High-performance zero-copy execution of
+  Python modules, scripts, and bioinformatics algorithms directly from C#.
+- `src/03_AgentWorkflowPatterns/DNAPlatform.AgentFramework` — the **single**
   workflow/agent engine (`WorkflowOrchestrator`, `AgentManager`, `NodeExecutor`).
   The DevUI API, the ConsoleApp demo and the AGUI server all bind this one
   instance; there is no second orchestrator anywhere in the repo.
-- `src/05_DevUI/DNAPlatform.DevUI.API` � ASP.NET Core 8 backend (port 5254).
+- `src/05_DevUI/DNAPlatform.DevUI.API` — ASP.NET Core 8 backend (port 5254).
   `Program.cs` holds DI registration + Minimal APIs, `Controllers/` holds the
   attribute-routed endpoints, `Services/` holds `MiseService`, `LogStore` and
   `SkillBackedNodeExecutor` (the bridge from a workflow node to the real skill
   registry).
-- `src/05_DevUI/DNAPlatform.DevUI.Web` � SvelteKit frontend (port 5173).
+- `src/05_DevUI/DNAPlatform.DevUI.AGUI` — **AG-UI Server** (port 5000), implementing
+  the official AG-UI protocol specification with Human-in-the-Loop (HITL) approval
+  interrupts, reasoning traces (`THINKING_DELTA`), and bi-directional state synchronization.
+- `src/05_DevUI/DNAPlatform.DevUI.Web` — SvelteKit frontend (port 5173 / port 3000).
   Prisma schema is at `src/05_DevUI/DNAPlatform.DevUI.Web/prisma/schema.prisma`.
-- `src/06_Skills` � skill registry (`DNAPlatform.Skills` + `DNAPlatform.Skills.Core`).
+- `src/06_Skills` — skill registry (`DNAPlatform.Skills` + `DNAPlatform.Skills.Core`).
   The API consumes the real registry directly; the old
   `AgentFrameworkStubs.cs` shim is **deleted**.
-- `src/07_CLI/DNAPlatform.Cli` � `dnaplatform`, an HTTP-only CLI client. See
+- `src/07_CLI/DNAPlatform.Cli` — `dnaplatform`, an HTTP-only CLI client. See
   the CLI section below.
-- `src/08_ACP` � **ACP adapter** (Node/TypeScript, standalone). Maps ACP methods
+- `src/08_ACP` — **ACP adapter** (Node/TypeScript, standalone). Maps ACP methods
   to HTTP calls to the .NET backend at :5254. Own `package.json`; not a dependency
   of DevUI.Web.
-- `src/09_Tests/DNAPlatform.Tests` � xUnit tests for the orchestrator
+- `src/09_Tests/DNAPlatform.Tests` — xUnit tests for the orchestrator
   (8 tests). `dotnet test` is the only automated gate; the frontend has none.
-- `scripts/` � `bootstrap.ps1` (one-time setup) and `test-e2e.ps1` (three-stage
-  verification with a real exit code). Both are PowerShell 5.1 only and both have
-  a confirmed green run. `verify-stack.bat` at the repo root is kept and still
-  works; it is interactive and has no exit code, so `test-e2e.ps1` is the one to
-  gate a build on.
+- `scripts/` — `dna.js` / `dna` (unified cross-platform CLI & TUI runner with
+  `smoketest`, `bootstrap`, `clean`, `tui`, and `env`). Root `.bat` files delegate
+  seamlessly to this unified runner across Windows, macOS, and Linux.
 - `docs/refactor.md` is the user-supplied spec (an input artifact, **aspirational**,
   not a description of current reality) and `docs/AGENT_FRAMEWORK_INTEGRATION.md`
-  is the Microsoft Agent Framework decision record � deferred, seam first.
+  is the Microsoft Agent Framework & AG-UI hosting decision record (seam first, AG-UI active).
   `docs/GAP_ANALYSIS.md` assesses both against the code.
 
 ## Toolchain

@@ -1,49 +1,71 @@
-# Build artifacts
+# .NET Build artifacts
 bin/
 obj/
 *.dll
 *.exe
 *.pdb
 
-# IDE
+# IDE & Editor
 .vscode/
 .vs/
 *.sln.iml
 *.user
 *.suo
 *.rs.bak
+*.swp
+*.swo
 
 # Dependencies
 packages/
 .nuget/
+node_modules/
+.bun/
 
-# Test results
+# Test results & coverage
 TestResults/
 coverage/
+.nyc_output/
 
-# OS
+# OS-specific files
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Environment
+# Environment configs (no secrets)
 .env
 .env.local
+.env.*.local
 
-# Logs (runtime output only; keep source dirs named "logs" tracked)
+# Runtime logs
 /logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Node / SvelteKit
-node_modules/
+# Node / SvelteKit / Vite
 .svelte-kit/
 build/
+dist/
 vite_build.log
+.vite/
 
-# Prisma / SQLite
-*.db
+# Python / CSnakes
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Prisma / SQLite temporary transaction journals
 *.db-journal
+*.db-wal
+*.db-shm
 
-# Temp files
+# Temporary test & scratch files
 _probe*.txt
 _test_*.json
 state_check.*
