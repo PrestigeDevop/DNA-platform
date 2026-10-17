@@ -1,3 +1,3 @@
 @echo off
-REM DNA Platform - Unified Cross-Platform Launcher
-node "%~dp0scripts\dna.js" %*
+REM DeNovoAutomata — Autonomous Polyglot Workflow Engine
+node "%~dp0scripts\3-denovo-automata.mjs" %*

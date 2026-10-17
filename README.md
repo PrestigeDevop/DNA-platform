@@ -1,483 +1,97 @@
-# DNA Platform - Bioinformatic Workflow Engine
-
-**A low-code/no-code platform for computational biology workflows using .NET agents framework with drag-and-drop workflow designer.**
-
-![DNA Platform Demo](https://img.shields.io/badge/Status-Alpha-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
-![.NET](https://img.shields.io/badge/.NET-8.0+-blue)
-
-<img width="1237" height="594" alt="image" src="https://github.com/user-attachments/assets/1d262d63-315d-43a4-a159-458e37a7b9e0" />
-
-## 🎯 Overview
-
-DNA Platform enables bioinformaticians to:
-- **Build complex workflows**  DSL using a visual WYSIWYG tooling drag-and-drop reusable commponet 
-- **Centralized polyglot runtime** one monolithic platform, automated dependency resolver 
-- **Compose reusable nodes** plug and play, validate scheme before running the workflow  
-- **annotate any library ** use plugin MCP servers or run locally via predefined serialization objects [logic_component]
-- **Interoperate** with Python, R, Node.js, JVM or .net core all through polyglot platform ready to scale  
-
-**Built on**: .NET 8.0+ and Node LTS | **Philosophy**: integrate A2A , FFI, IPC, and FaaS for cloud-native scalability
-
-## ✨ Key Features
-
-### 🔧 Agent-Driven Workflow Engine
-- **Topological execution** for correct dependency ordering
-- **Parallel node execution** for performance
-- **Smart retry policies** with exponential backoff
-- **Full async/await** support for non-blocking operations
-
-### 🎨 Extensible Node Types
-- **Input/Output nodes** for data sources and sinks
-- **Agent nodes** with AI reasoning capabilities
-- **Processing skills** for deterministic operations
-- **Conditional branching** for complex logic
-- **Loop constructs** for iteration
-- **Subworkflow references** for composition
-
-### 🤖 AI Agent Framework & AG-UI Hosting
-- **AG-UI Protocol Specification** ([docs.ag-ui.com](https://docs.ag-ui.com/sdk/dotnet/hosting/overview)): First-class Server-Sent Events (SSE) streaming server supporting `RUN_STARTED`, `THINKING_DELTA`, `TOOL_CALL_STARTED/FINISHED`, `STATE_SNAPSHOT`, `STATE_DELTA`, and `RUN_FINISHED`.
-- **Human-in-the-Loop (HITL) Interruption**: Sensitive actions (e.g. sequence mutation, pipeline dispatch) emit `APPROVAL_REQUESTED` interrupts, pausing execution until the human operator authorizes or rejects via the UI.
-- **Provider-agnostic `IAgent` seam** — Bound to `DNAPlatform.AgentFramework`, with Microsoft Agent Framework evaluated and decoupled behind a clean seam. See [docs/AGENT_FRAMEWORK_INTEGRATION.md](./docs/AGENT_FRAMEWORK_INTEGRATION.md).
-- **Microsoft Copilot Local Reasoning**: Local ONNX Runtime inference engine with tool calling and cognitive thinking traces.
-
-### 🧩 Extensible Skill System
-- **Plugin architecture** for custom bioinformatic algorithms
-- **Built-in skills**: Data transform, IUPAC Validation, Merge results, C# Clock (`current-time`), Pairwise Sequence Alignment (Needleman-Wunsch).
-- **C# & TypeScript Custom Skill Authoring**: Live code editor with interactive verification and AI annotation helper.
-
-### 🌐 Polyglot Runtime & CSnakes in Core
-- **CSnakes Python-C# Interop in `DNAPlatform.Core`**: High-performance zero-copy bridge between Python and C#, supporting native Python module execution, NumPy arrays, BioPython sequence analysis, and DNA metrics computation.
-- **Interactive Polyglot Kernel**: Live multi-cell execution for C# .NET Interactive, Python 3, Node.js / TypeScript, and Bash.
-- **Unified Cross-Platform CLI & TUI**: Single cross-platform command runner (`npm run cli`, `npm run tui`, `npm run smoketest`, `npm run clean`) replacing legacy platform-specific scripts.
-
-
-### 💻 DevUI - Web-Based Designer
-- **Workflow-level lifecycle: Configure → Test → Run.** Configure ships today (⚙️ on
-  every workflow card: mise/runtime status, export, import, verify). **Test is done** —
-  `🩺 Test` renders `WorkflowTestResult.svelte` with structural validation only
-- **Drag-and-drop workflow builder** for composing nodes on a canvas
-- **Workflow persistence** via Prisma/SQLite (SvelteKit server routes)
-- **Backend execution** proxied to the .NET orchestrator
-- **REST API** for workflow management
-- **Real-time execution monitoring**
-- **Customizble**
-
-## 🚀 Quick Start (DevUI Web App)
-
-### Prerequisites
-- **.NET 8.0+ SDK** installed
-- **Node.js 20+** installed  
-- **[mise](https://mise.jdx.dev/)** — optional, but recommended for reproducible tool
-  pinning and for the ⚙️ Configure view. The app runs without it.
-- **Git** (optional, for version control)
-
-### One-Command Setup (Cross-Platform)
-
-```bash
-# 1. Once, on a fresh clone: toolchain probe, dependencies, and Prisma database initialization
-npm run bootstrap
-# or: node scripts/dna.js bootstrap
-
-# 2. Launch the interactive Cross-Platform Terminal User Interface (TUI)
-npm run tui
-# or: node scripts/dna.js tui
-
-# 3. Automated Cross-Platform Smoke Testing (replaces legacy e2e and .bat scripts)
-npm run smoketest
-# or: node scripts/dna.js smoketest
-
-# 4. Clean workspace artifacts, caches, and logs
-npm run clean
-# or: node scripts/dna.js clean
-
-# 5. Start dev server stack
-npm run dev
-```
-
-On Windows, double-clicking `run-all.bat`, `verify-stack.bat`, or `cleanup-folder.bat` now delegates seamlessly to the unified cross-platform runner `scripts/dna.js`.
-
-### Verifying the stack
-The platform provides a comprehensive automated test gate:
-```bash
-npm run smoketest
-```
-It tests database connectivity, workflow structural validation, agent execution, skills registry, C# high-precision time providers, AG-UI protocol streaming with Human-in-the-Loop approval resumption, and the polyglot CSnakes kernel.
-
-```bash
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-e2e.ps1
-```
-
-Three stages with a real exit code: a static build + `npm run check` against a
-recorded baseline, a backend stage that starts and stops the API on :5254, and a
-frontend stage that builds and serves the app. It stops everything it starts.
-
-`verify-stack.bat` is kept and still works — it is the quick interactive check.
-`test-e2e.ps1` is the one to gate a build on, because it exits non-zero.
-
-### Optional: pin the toolchain with mise
-
-```bash
-mise install        # installs the dotnet 8 + node lts versions mise.toml pins
-mise tasks ls       # confirms build, build:web, dev were picked up
-mise run build      # dotnet build DNAPlatform.sln
-```
-
-`mise.toml` pins `.NET 8` and `Node.js LTS` — the two platform-provided defaults —
-and sets `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1`. With mise absent, the platform
-still runs and `GET /api/environment` reports `miseInstalled: false` with a
-`"yellow"` overall status rather than failing. `bootstrap.ps1` probes mise with
-`Get-Command` and never requires it.
-
-### Detailed Manual Setup
-
-#### 1. Clone & Restore
-```bash
-git clone https://github.com/PrestigeDevop/DNA-platform.git
-cd DNA-platform
-
-# Restore .NET dependencies
-dotnet restore
-
-# Build solution
-dotnet build
-```
-
-#### 2. Install Frontend Dependencies
-```bash
-cd src\05_DevUI\DNAPlatform.DevUI.Web
-npm install
-cd ..\..\..\..
-```
-
-#### 3. Run the System
-From main directory:
-```bash
-run-all.bat
-```
-
-Or run separately:
-
-**Backend only:**
-```bash
-cd src\05_DevUI\DNAPlatform.DevUI.API
-dotnet run --urls http://localhost:5254
-```
-
-**Frontend only (Svelte):**
-```bash
-cd src\05_DevUI\DNAPlatform.DevUI.Web
-npm install
-npm run dev
-```
-
-### Access Points
-
-| Service | URL | Notes |
-|---------|-----|-------|
-| Frontend (SvelteKit + Prisma) | http://localhost:5173 | Main UI; persists workflows/agents/executions in SQLite |
-| Backend API (.NET 8) | http://localhost:5254 | Workflow execution engine + skills |
-| Swagger docs | http://localhost:5254/swagger | REST API reference. Needs the Development environment — see Troubleshooting |
-| Health check | http://localhost:5254/health | Also proxied at http://localhost:5173/health |
-| Environment status | http://localhost:5254/api/environment | mise/runtime status; proxied at http://localhost:5173/api/environment |
-
-### Command line
-
-`dnaplatform` is a thin HTTP client for the same API. It never runs a workflow
-itself — it asks the platform to, so there is only ever one execution engine.
-
-```bash
-dnaplatform env                       # mise + runtime status; works with either server up
-dnaplatform validate <workflow-id>    # structural checks only; exit 0 = valid
-dnaplatform run <workflow-id>         # execute and print per-node results
-dnaplatform status [--all]            # latest run per workflow
-dnaplatform logs [-n 50] [--since ID] # tail the platform log buffer
-dnaplatform cancel <execution-id>     # request cancellation
-```
-
-Add `--json` to any of them for machine-readable output. `run` and `validate`
-exit non-zero on failure, so they work as CI gates.
-
-The default targets are `--url http://127.0.0.1:5173` (the DevUI origin, which
-serves the workflow and execution routes) and `--api-url http://127.0.0.1:5254`
-(the .NET origin, used only for `cancel`). Override either with the flag or with
-`DNA_PLATFORM_URL` / `DNA_PLATFORM_API_URL`.
-
-### Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| Port 5254 already in use | Change port in `run-all.bat` or kill the process using it. `run-all.bat:8` already pre-kills stale listeners; `test-e2e.ps1` does too |
-| Port 5173 already in use | A Vite child can outlive its `npm` parent and keep `[::1]:5173` held, which is invisible on `127.0.0.1`. Check both address families and use `taskkill /T /F /PID <wrapper>` |
-| `prisma generate` fails with `EPERM` | A dev server still holds `query_engine-windows.dll.node`. Stop it first |
-| `swagger` returns 404 | `dotnet run --no-launch-profile` also drops `ASPNETCORE_ENVIRONMENT=Development`, and Swagger is only mapped in Development. Set it explicitly: `$env:ASPNETCORE_ENVIRONMENT=Development`. `run-all.bat` does not pass the flag, so it works there |
-| `npm install` fails | Clear cache: `npm cache clean --force` then retry |
-| `dotnet run` fails | Run `dotnet restore` and `dotnet build` first |
-| `npm run check` reports 6 errors | Expected — that is the recorded baseline. `test-e2e.ps1` fails only on a *new* diagnostic |
-| Frontend can't connect to backend | Ensure backend is running on port 5254 (check proxy in vite.config.ts) |
-| `dnaplatform status` 404s | You pointed `--url` at `:5254`. The execution list is SvelteKit's; keep the default `:5173` |
-| Configure view shows YELLOW | mise is not installed, not on `PATH`, or `mise install` has not run. Yellow is a valid state — the platform-provided default (.NET 8 / Node LTS) is standing in. Check `mise --version` (exit 0 = available) |
-
-### First Time Setup (Combined Steps)
-```bash
-git clone https://github.com/PrestigeDevop/DNA-platform.git
-cd DNA-platform
-
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1
-run-all.bat
-```
-
-### Next Steps
-1. Open http://localhost:5173 in your browser
-2. Navigate to **Workflows** to create your first workflow
-3. On any workflow card, click **⚙️ Configure** to see the execution environment:
-   mise availability, the resolved version of each runtime (.NET 8, Node.js LTS), and
-   GREEN/YELLOW/RED dependency status. You can also export the project `mise.toml`,
-   import a replacement (it overwrites — export first), and re-verify
-4. Check **Skills** to see available bioinformatic skills
-5. Monitor **Executions** to track workflow progress
-6. Manage **Agents** to configure AI agents
-
-### Console demo (agent framework patterns)
-
-```bash
-cd src/03_AgentWorkflowPatterns/DNAPlatform.AgentWorkflowPatterns.ConsoleApp
-dotnet run
-```
-
-### Demo Output
-The console app demonstrates three workflow patterns:
-1. **Sequential**: Simple data input → transform → output
-2. **Parallel**: Two agents analyze in parallel, merge results
-3. **Dynamic**: Loop over collection with conditional processing
-
-## 📁 Project Structure
-
-```
-DNA-platform/
-├── mise.toml                                # Toolchain pins (.NET 8, Node LTS) + build/dev tasks
-├── run-all.bat                              # Single entry point: starts API + UI
-├── verify-stack.bat                         # Quick interactive stack check
-├── AGENTS.md                                # Agent-facing repo guidance (read this first)
-├── scripts/                                 # Setup and verification
-│   ├── bootstrap.ps1                        # Idempotent one-time setup
-│   └── test-e2e.ps1                         # Three-stage verification, real exit code
-├── docs/                                    # All documentation
-│   ├── GAP_ANALYSIS.md                      # Spec requirement vs. current state
-│   ├── AGENT_FRAMEWORK_INTEGRATION.md       # Microsoft Agent Framework decision record
-│   ├── refactor.md                          # The user-supplied spec (input artifact)
-│   └── TODO.md                              # Current task list
-├── src/
-│   ├── 01_Core/
-│   │   └── DNAPlatform.Core/                # ⚠ Placeholder only, not wired up
-│   ├── 03_AgentWorkflowPatterns/            # Core agent framework (stable)
-│   │   ├── DNAPlatform.AgentFramework/      # THE engine: orchestrator, agents, nodes
-│   │   └── DNAPlatform.AgentWorkflowPatterns.ConsoleApp/   # 3-pattern demo
-│   ├── 04_WorkflowEngine/
-│   │   └── DNAPlatform.Workflow/            # ⚠ Placeholder only — NOT the engine
-│   ├── 05_DevUI/                            # Web UI + API (active)
-│   │   ├── DNAPlatform.DevUI.API/           # .NET 8 REST API (port 5254)
-│   │   ├── DNAPlatform.DevUI.Web/           # SvelteKit UI + Prisma/SQLite (port 5173)
-│   │   └── DNAPlatform.DevUI.AGUI/          # Port 5000 server (built, not the UI path)
-│   ├── 06_Skills/                           # DNAPlatform.Skills — the real registry
-│   │   └── DNAPlatform.Skills.Core/         # ⚠ Placeholder — NOT the registry
-│   ├── 07_CLI/
-│   │   └── DNAPlatform.Cli/                 # dnaplatform — HTTP-only CLI client
-│   ├── 08_ACP/                              # ACP adapter — thin Node/TypeScript adapter over the HTTP API
-│   └── 09_Tests/
-│       └── DNAPlatform.Tests/               # Orchestrator tests (dotnet test)
-├── DNAPlatform.sln                          # The one .NET solution
-└── README.md                                # This file
-```
-
-> ✅ **One solution, one engine.** `DNAPlatform.slnx` is deleted and
-> `DNAPlatform.sln` is the only solution; it builds `DNAPlatform.Skills`, the
-> AGUI server, the tests and the CLI, clean at 0 warnings. The DevUI API binds the
-> real `DNAPlatform.AgentFramework` orchestrator and the real skill registry — the
-> in-memory double is gone, so there is exactly one execution engine in the repo.
->
-> ⚠️ **Two `Class1.cs` placeholders** remain in `DNAPlatform.Core` and
-> `DNAPlatform.Workflow` (`src/04_WorkflowEngine/`), plus `DNAPlatform.Skills.Core`.
-> None is on a live code path. `04_WorkflowEngine` is a naming trap: the real
-> engine is `src/03_AgentWorkflowPatterns/DNAPlatform.AgentFramework`.
-
-## 📖 Documentation
-
-All docs live in **[docs/](./docs/)**:
-- **[AGENTS.md](./AGENTS.md)** - Repo-specific guidance for coding agents (routing ownership, envelope conventions, gotchas)
-- **[docs/GAP_ANALYSIS.md](./docs/GAP_ANALYSIS.md)** - Spec requirement vs. current state, with evidence and §16 priorities
-- **[docs/AGENT_FRAMEWORK_INTEGRATION.md](./docs/AGENT_FRAMEWORK_INTEGRATION.md)** - Microsoft Agent Framework decision record (defer adoption, build the seam first)
-- **[docs/refactor.md](./docs/refactor.md)** - The user-supplied spec. An input artifact, not a description of current reality; assessed by GAP_ANALYSIS.md
-- **[docs/TODO.md](./docs/TODO.md)** - Current task list
-
-> Those four files are the whole documentation surface. `docs/refactor.md` is an
-> input artifact, not current state; when any document disagrees with the source,
-> trust `Program.cs`, `vite.config.ts`, `schema.prisma`, and the `+server.ts`
-> route handlers.
-
-## 🛣️ Roadmap
-
-### Phase 1: Foundation ✅ COMPLETE
-- [x] Core workflow orchestration engine
-- [x] Node execution framework with topological DAG
-- [x] Agent manager & skill registry
-- [x] Console demo with 3 patterns
-- [x] ASP.NET Core REST API + Swagger
-
-### Phase 2: DevUI API ✅ COMPLETE
-- [x] SvelteKit frontend (port 5173) + Prisma/SQLite persistence
-- [x] ASP.NET Core REST API (port 5254)
-- [x] Workflow CRUD + agent CRUD + execution list
-- [x] Workflow execute → record result in SQLite
-- [x] Request logging (console + web Logs page)
-
-### Phase 3: Web Designer + Custom Skills ✅ COMPLETE
-- [x] Custom skills framework (`DNAPlatform.Skills`)
-- [x] Built-in + bioinformatics skills
-- [x] GUI-triggered skill execution (`/api/skills/{id}/execute`)
-- [x] Skill “Details” parameter editor (typed input fields)
-- [x] Custom snippet model (`CustomSnippet`) + CRUD (`/api/snippets`)
-- [x] Snippet execute endpoint with hello-world .NET handler
-- [x] “Create Custom Snippet” dialog on `/skills` (runtime selector, IO editors, test, save to palette)
-- [x] Drag-and-drop designer integrated into `/workflows`
-- [x] Designer IO ports from snippet/node metadata
-- [x] Click node → inline inspect/edit panel
-- [x] Connected services status panel (backend, polyglot kernel, placeholder external MCP/local executor)
-
-### Phase 3.5: Environment & Toolchain ✅ COMPLETE (2026-10-05)
-- [x] `mise.toml` pinning .NET 8 + Node LTS, with `build` / `build:web` / `dev` tasks
-- [x] `MiseService` + `EnvironmentController` (4 endpoints under `/api/environment*`)
-- [x] GREEN/YELLOW/RED runtime status with platform-default fallbacks
-- [x] Workflow-level Configure view (`⚙️ Configure` on `/workflows`) — export / import / verify
-- [x] Workflow-level Test (`🩺 Test` on `/workflows`) — structural validation only, no execution
-
-### Phase 3.75: Consolidation ✅ COMPLETE (2026-10-05)
-- [x] One execution engine: the DevUI API binds the real `WorkflowOrchestrator` and the
-      real `SkillRegistry`; the in-memory double is deleted
-- [x] Live per-node execution state — a status chip per designer node (colour + icon + word)
-- [x] Connection drawing: source port → target port, SVG edge with an arrowhead
-- [x] `dnaplatform` CLI (`run` / `validate` / `status` / `logs` / `cancel` / `env`)
-- [x] MCP plugin UI on `/skills` — `McpPluginShell.svelte` shell (buttons not wired yet); the .NET API serves `GET /api/mcp/servers` and `POST /api/mcp/servers/import` via `McpServersController` + `McpServerDiscovery`
-- [x] `scripts/bootstrap.ps1` + `scripts/test-e2e.ps1`, both with a confirmed green run
-- [x] One solution file; version reconciled to `0.3.0-alpha` across `/health`, `/api/info`,
-      the startup banner and Swagger
-- [x] ACP adapter (`src/08_ACP/`) — done: a thin Node/TypeScript adapter over the HTTP API
-
-### Phase 4: AI Integration 📋 Planned (November)
-- [ ] `IAgent` provider seam (provider-agnostic, no new package)
-- [ ] Agent configuration model
-- [ ] Microsoft Agent Framework as an optional provider — **deferred** behind the seam; see [docs/AGENT_FRAMEWORK_INTEGRATION.md](./docs/AGENT_FRAMEWORK_INTEGRATION.md)
-- [ ] Local LLM support (Ollama, LM Studio) with model switching
-- [ ] Function calling / tool use patterns
-- [ ] Agent reasoning traces display
-- [ ] Prompt templating and versioning
-- [ ] Token usage tracking per execution
-
-### Phase 5: local Bioinformatics MCPS 📋 Planned 
-- [] Sequence alignment skills (BLAST, Needleman-Wunsch, Smith-Waterman)
-- [ ] FASTA/FASTQ file loading and parsing
-- [ ] Molecular docking simulations
-- [ ] Statistical analysis nodes
-- [ ] Visualization components (D3.js, Plotly integration)
-- [ ] Database integration (UniProt, NCBI E-utilities)
-
-### Phase 6: Production 📋 Planned 
-- [ ] PostgreSQL persistence (replace SQLite with production DB)
-- [ ] Redis caching for workflow states and agent contexts
-- [ ] Docker containerization for all services
-- [ ] Kubernetes deployment manifests
-- [ ] CI/CD pipeline (GitHub Actions)
-- [ ] User authentication (JWT/OAuth integration)
-- [ ] Multi-user collaboration features
-- [ ] Comprehensive audit logging
-- [ ] Performance monitoring & alerting
-
-## 🧪 Current Status
-
-**v0.3.0-alpha**: Core engine + DevUI API complete, web designer + custom skills
-complete, the mise-based Configure view, the consolidation pass (one engine, CLI,
-scripts, workflow Test, live node state, MCP plugin UI). 2026-10-12.
-
-The version is now real rather than documentary: a single `PlatformVersion`
-constant in `Program.cs` feeds `/health`, `/api/info`, the startup banner and the
-Swagger document. Verified: `/health` → `"version":"0.3.0-alpha"`, and
-`swagger.json` → `info.version` `0.3.0-alpha`.
-
-### Achieved ✅
-- ✅ Topological DAG execution with parallel processing
-- ✅ Parallel node processing via Task.WhenAll
-- ✅ Error handling & retry logic with exponential backoff
-- ✅ Extensible architecture (ISkill, IAgent interfaces)
-- ✅ Working console demo with 3 workflow patterns
-- ✅ **REST API fully functional** (workflows, agents, executions, skills, logs)
-- ✅ **Prisma + SQLite persistence** for audit trail
-- ✅ **SvelteKit reactive frontend** (CRUD via server routes)
-- ✅ **Custom skills system** (backend + GUI execution)
-- ✅ **Custom snippet model** + hello-world .NET snippet endpoint
-- ✅ **Drag-and-drop designer** integrated into `/workflows`
-- ✅ **Connected services panel** (backend + polyglot kernel + placeholder external MCP/local executor)
-- ✅ **mise integration** — `mise.toml`, `MiseService`, `EnvironmentController`, GREEN/YELLOW/RED status
-- ✅ **Workflow-level Configure view** (`⚙️` on `/workflows`) with export / import / verify
-- ✅ **Workflow-level Test** (`🩺` on `/workflows`) — structural validation only
-- ✅ **Live per-node execution state** — a status chip per node (colour + icon + word)
-- ✅ **Connection drawing** in the designer (source port → target port → SVG edge with arrowhead)
-- ✅ **One execution engine** — the DevUI API uses the real orchestrator and skill registry
-- ✅ **`dnaplatform` CLI** — HTTP-only, six subcommands, `--json` everywhere, scriptable exit codes
-- ✅ **`bootstrap.ps1` + `test-e2e.ps1`** — idempotent setup and three-stage verification with a real exit code
-- ✅ **ACP adapter** (`src/08_ACP/`) — thin Node/TypeScript adapter over the HTTP API
-- ✅ **Orchestrator tests** — `dotnet test`, 8 passing
-
-### In Development 🚧
-- 🚧 Export/import workflow JSON with runtime environment metadata
-- 🚧 Agent-backed nodes in workflows
-- 🚧 Real custom code execution path for polyglot kernel snippets (hello-world placeholder is live)
-- 🚧 Real-time log streaming — `/logs` still polls every 1500 ms and the buffer is in-memory only
-- 🚧 PostgreSQL persistence — deferred; SQLite is adequate today and the JSON-blob columns would need migrating
-
-## 💡 Quick Example
-
-```csharp
-var workflow = new Workflow 
-{
-    Id = "gene-analysis",
-    Name = "Gene Analysis Pipeline",
-    Nodes = new[] { inputNode, analysisNode, outputNode },
-    Connections = new[] { conn1, conn2 }
-};
-
-var result = await orchestrator.ExecuteWorkflow(workflow);
-Console.WriteLine($"Status: {result.Status} - {result.Duration.TotalMilliseconds}ms");
-```
-
-For a runnable version of all three patterns (sequential, parallel, dynamic), see
-`src/03_AgentWorkflowPatterns/DNAPlatform.AgentWorkflowPatterns.ConsoleApp`.
-
-## 🤝 Contributing
-
-Contributions welcome! Please:
-1. Fork the repo
-2. Create feature branch
-3. Add tests — note there is currently **no test project** and coverage is 0%, so this
-   means adding the first one
-4. Build & verify: `dotnet build` (or `mise run build`), then verify manually per
-   [AGENTS.md](./AGENTS.md) → Verification. `npm run check` in the Web project has 6
-   pre-existing errors — do not add to them
-5. Submit PR
-
-## 📞 Resources
-
-- **GitHub Issues**: Bug reports & feature requests
-- **Wiki**: [Terminology & concepts](https://github.com/PrestigeDevop/DNA-platform/wiki)
-- **References**: 
-  - [Open Free Energy](https://www.openfree.energy/)
-  - [OpenBioSim](https://www.openbiosim.org/)
-  - [NVIDIA BioNeMo](https://github.com/NVIDIA-BioNeMo/bionemo-agent-toolkit)
-  - [Kubeflow](https://www.kubeflow.org/) 
-
-## 📄 License
-
-MIT License - Open source for research & development
+# 🧬 DeNovoAutomata
+
+**Autonomous Polyglot Computational Biology & Workflow Automation Platform**
+
+[![Status: Active](https://img.shields.io/badge/Status-Active_Alpha-brightgreen.svg)](#)
+[![Runtime: .NET 8.0](https://img.shields.io/badge/.NET-8.0-blue.svg)](https://dotnet.microsoft.com/)
+[![Frontend: SvelteKit 2](https://img.shields.io/badge/Frontend-SvelteKit_2-orange.svg)](https://kit.svelte.dev/)
+[![Core: CSnakes](https://img.shields.io/badge/Core-CSnakes_Python_Interop-yellow.svg)](#)
+[![Protocol: AG--UI](https://img.shields.io/badge/Protocol-AG--UI_v1.0.0-purple.svg)](https://docs.ag-ui.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 ---
 
-**Status**: 🚀 Alpha | **Version**: 0.3.0-alpha | **Updated**: 2026-10-05
+## 🎯 Overview
+
+**DeNovoAutomata** is an open-source, local-first biological workflow orchestration platform. Inspired by visual automation tools like **n8n**, it empowers computational biologists, researchers, and developers to visually compose, validate, and execute complex biological pipelines with intelligent AI agent governance.
+
+- **Visual Workflow Canvas**: Build and test directed acyclic graph (DAG) pipelines via an intuitive drag-and-drop designer.
+- **Polyglot Execution with CSnakes**: Execute compiled C# .NET algorithms and Python bioinformatics packages (BioPython, NumPy) side-by-side with zero-overhead data transfer.
+- **Human-in-the-Loop (HITL) Governance**: AI agents stream reasoning traces and pause automatically before sensitive operations (e.g., sequence mutations, system execution) to request operator sign-off.
+- **Dual Interfaces**: Work seamlessly in your browser via the SvelteKit web studio or in the terminal using the native **Terminal.Gui** console dashboard.
+
+---
+
+## 🚀 The 3 Simple Commands
+
+DeNovoAutomata is cross-platform across **Linux**, **macOS**, and **Windows**.
+
+### 1. First-Time Setup
+Probes your toolchain, sets up configurations, and initializes the local SQLite database.
+```bash
+npm run bootstrap
+# or: node scripts/1-bootstrap.mjs
+```
+
+### 2. Launch the Platform
+Boots instantly in under one second without reinstalling. Starts the Web Studio on port 3000, API on port 5254, and AG-UI server on port 5000.
+```bash
+npm start
+# or: node scripts/3-denovo-automata.mjs
+```
+*Tip: On Windows, you can also double-click `run-all.bat`.*
+
+### 3. Test & Clean
+Runs the automated end-to-end verification suite across all 10 platform subsystems. Use `--clean` to remove temporary files before pushing to Git.
+```bash
+# Run test suite
+npm test
+# or: node scripts/2-test-dev.mjs
+
+# Run tests and clean build artifacts
+npm run test:clean
+# or: node scripts/2-test-dev.mjs --clean
+```
+
+---
+
+## ✨ Key Features
+
+### 🔄 Visual Workflow Canvas (n8n-Inspired)
+- Compose multi-step computational pipelines visually.
+- Native node types: **Input**, **ProcessingSkill**, **Agent**, **Loop**, **Conditional**, and **Output**.
+- Structural DAG verification prevents infinite cycles and unlinked dependencies before execution.
+
+### 🤖 AI Agent Framework & AG-UI Hosting
+- Native implementation of the **AG-UI Protocol** ([docs.ag-ui.com](https://docs.ag-ui.com/sdk/dotnet/hosting/overview)).
+- Streams real-time cognitive deliberation traces (`THINKING_DELTA`) and tokens (`TEXT_DELTA`).
+- Built-in **Human-in-the-Loop (HITL)**: Sensitive actions trigger an `APPROVAL_REQUESTED` interrupt, allowing operators to inspect arguments, authorize, or decline directly from the UI.
+- Local reasoning powered by Microsoft Copilot ONNX runtime.
+
+### 🐍 CSnakes Polyglot Core
+- Direct zero-copy interop between .NET 8 and Python 3.
+- Fast biological calculations for GC content, GC skew, nucleotide frequencies, and reverse complements.
+- Pure C# fallback ensures high reliability on environments without Python installed.
+
+### 🧩 Bioinformatic Skill System
+- **Needleman-Wunsch Aligner**: Global pairwise sequence alignment with dynamic programming.
+- **C# High-Precision Clock Provider**: Accurate microsecond timing for algorithmic benchmarking.
+- **IUPAC Sequence Validator**: Validates DNA, RNA, and degenerate nucleotide strings.
+- **Interactive Skill Authoring**: Live code editor with interactive verification and AI annotation helper.
+
+### 🖥️ Native Terminal.Gui Console TUI
+- Built on `Terminal.Gui` (`gui.cs`) in C#.
+- Provides windowed console dashboards, menus, hotkey controls (`[R]`estart, `[T]`est, `[C]`lean, `[O]`pen, `[Q]`uit), and live health monitors.
+
+---
+
+## 📚 Documentation & Architecture
+
+- **[System Architecture (`docs/architecture.md`)](./docs/architecture.md)** — Low-code/no-code bioinformatic platform architecture, folder structure, agentic development guide, developmental gaps, gotchas, and final intent.
+- **[Development Guide & Roadmap (`docs/development.md`)](./docs/development.md)** — Consolidated development logs, task lists (TODO), revised phase milestones, and verification gates.
+
+---
+
+## 📄 License
+
+DeNovoAutomata is licensed under the [MIT License](./LICENSE).

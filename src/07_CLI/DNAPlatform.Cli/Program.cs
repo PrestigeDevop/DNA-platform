@@ -274,10 +274,17 @@ bootstrapCommand.SetHandler(() =>
 });
 
 // ------------------------------------------------------------------ tui
-var tuiCommand = new Command("tui", "Launch the interactive Terminal User Interface (TUI).");
-tuiCommand.SetHandler(() =>
+var tuiCommand = new Command("tui", "Launch the interactive Terminal.Gui User Interface (TUI).");
+tuiCommand.SetHandler((InvocationContext ctx) =>
 {
-    Console.WriteLine("Launching DNA Platform Interactive Terminal Dashboard...");
+    var url = ctx.ParseResult.GetValueForOption(urlOption)
+              ?? Environment.GetEnvironmentVariable("DNA_PLATFORM_URL")
+              ?? "http://127.0.0.1:5173";
+    var apiUrl = ctx.ParseResult.GetValueForOption(apiUrlOption)
+                 ?? Environment.GetEnvironmentVariable("DNA_PLATFORM_API_URL")
+                 ?? "http://127.0.0.1:5254";
+
+    TerminalGuiDashboard.Run(url, apiUrl);
 });
 
 root.AddCommand(runCommand);

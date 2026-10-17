@@ -34,10 +34,8 @@ Repository-specific guidance for agents working on the DNA Platform.
 - `scripts/` — `dna.js` / `dna` (unified cross-platform CLI & TUI runner with
   `smoketest`, `bootstrap`, `clean`, `tui`, and `env`). Root `.bat` files delegate
   seamlessly to this unified runner across Windows, macOS, and Linux.
-- `docs/refactor.md` is the user-supplied spec (an input artifact, **aspirational**,
-  not a description of current reality) and `docs/AGENT_FRAMEWORK_INTEGRATION.md`
-  is the Microsoft Agent Framework & AG-UI hosting decision record (seam first, AG-UI active).
-  `docs/GAP_ANALYSIS.md` assesses both against the code.
+- `docs/architecture.md` — Complete platform architecture, folder structure, agentic guide, gotchas, and final intent.
+- `docs/development.md` — Consolidated development logs, task lists (TODO), and milestone roadmap.
 
 ## Toolchain
 
@@ -49,23 +47,17 @@ Repository-specific guidance for agents working on the DNA Platform.
 ## Build & run
 
 ```bash
-# One-time setup: toolchain probe, restore, build, npm install, prisma generate,
-# prisma db push. Idempotent. Run this before run-all.bat on a fresh clone.
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1
+# One-time setup: toolchain probe, dependencies, and Prisma database initialization
+npm run bootstrap
+# or: node scripts/1-bootstrap.mjs
 
-# Backend � --no-launch-profile and --urls are mandatory (see Gotchas)
-dotnet build DNAPlatform.sln
-cd src/05_DevUI/DNAPlatform.DevUI.API
-dotnet run --no-launch-profile --urls http://127.0.0.1:5254
+# Launch development environment (instant boot)
+npm start
+# or: node scripts/3-denovo-automata.mjs
 
-# Frontend
-cd src/05_DevUI/DNAPlatform.DevUI.Web
-npm install
-npx prisma db push          # requires DATABASE_URL (see .env); rerun after schema edits
-npm run dev                 # port 5173
-
-# Verification � additive to verify-stack.bat, which it leaves in place
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-e2e.ps1
+# Verification & test suite (10 automated checks with --clean pre-push option)
+npm test
+# or: node scripts/2-test-dev.mjs
 ```
 
 `run-all.bat` starts both. Ports: 5173 SvelteKit, 5254 .NET, 11434 Ollama
@@ -135,7 +127,7 @@ the SvelteKit convention. Error bodies are `{ error }` on SvelteKit and
   serialize to strings.
 - `PlatformVersion` in `Program.cs` is the single source of truth for the version
   reported by `/health`, `/api/info`, the startup banner and the Swagger doc.
-  Keep README.md and docs/TODO.md in step with it.
+  Keep README.md and docs/development.md in step with it.
 
 ## CLI
 
@@ -145,7 +137,7 @@ the SvelteKit convention. Error bodies are `{ error }` on SvelteKit and
 - **HTTP only.** No `ProjectReference` to `DNAPlatform.AgentFramework` and it
   never constructs a `WorkflowOrchestrator`. It asks the platform to run things.
   Adding a project reference would reintroduce the second-engine split that
-  `docs/refactor.md` �15 forbids.
+  `docs/architecture.md` �15 forbids.
 - **It needs two base URLs.** `--url` (default `DNA_PLATFORM_URL`, then
   `http://127.0.0.1:5173`) is the DevUI origin and serves `/api/workflows`,
   `/api/executions`, `/api/snippets` and `/api/logs`. `--api-url` (default
@@ -204,7 +196,7 @@ npm run smoke        # pipes a real session, asserts valid JSON-RPC on stdout
   separate column.
 - `Execution.duration` is an integer column of milliseconds, and
   `parseDurationMs` rounds to it. Any run under 1 ms stores `0`. See
-  docs/TODO.md ? *Next Up*.
+  docs/development.md ? *Next Up*.
 
 ## Serialization gotchas
 
@@ -230,7 +222,7 @@ npm run smoke        # pipes a real session, asserts valid JSON-RPC on stdout
   click so the thin curve stays visible.
 - Test step: `WorkflowTestResult.svelte` renders
   `POST /api/workflows/validate`. It is labelled **structural only** and must not
-  grow a speculative validation engine (`docs/refactor.md` �4).
+  grow a speculative validation engine (`docs/architecture.md` �4).
 - Logs console: `/logs`, backed by `src/lib/services/logs.ts` (merges frontend
   console capture with the backend buffer).
 - Pages: `/`, `/workflows`, `/skills`, `/agents`, `/executions`, `/logs`, `/about`.

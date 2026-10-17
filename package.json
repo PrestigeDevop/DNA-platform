@@ -10,10 +10,13 @@
     "dev": "npm run dev --workspace=src/05_DevUI/DNAPlatform.DevUI.Web",
     "build": "npm run build --workspace=src/05_DevUI/DNAPlatform.DevUI.Web",
     "preview": "npm run preview --workspace=src/05_DevUI/DNAPlatform.DevUI.Web",
-    "cli": "node ./scripts/dna.js",
+    "start": "node ./scripts/3-denovo-automata.mjs",
+    "bootstrap": "node ./scripts/1-bootstrap.mjs",
+    "test": "node ./scripts/2-test-dev.mjs",
+    "test:clean": "node ./scripts/2-test-dev.mjs --clean",
+    "clean": "node ./scripts/2-test-dev.mjs --clean",
+    "smoketest": "node ./scripts/2-test-dev.mjs",
     "tui": "node ./scripts/dna.js tui",
-    "smoketest": "node ./scripts/dna.js smoketest",
-    "bootstrap": "node ./scripts/dna.js bootstrap",
-    "clean": "node ./scripts/dna.js clean"
+    "cli": "node ./scripts/dna.js"
   }
 }
