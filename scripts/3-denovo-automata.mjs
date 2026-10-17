@@ -44,8 +44,40 @@ const HELIX_FRAMES = [
   '  🧬  T ═══════ A  🧬  '
 ];
 
+import fs from 'fs';
+import { execSync } from 'child_process';
+
 let frameIdx = 0;
 let devProcess = null;
+let apiProcess = null;
+
+function ensureViteInstalled() {
+  const webDir = path.join(ROOT_DIR, 'src/05_DevUI/DNAPlatform.DevUI.Web');
+  const webNodeModules = path.join(webDir, 'node_modules');
+  const rootNodeModules = path.join(ROOT_DIR, 'node_modules');
+
+  if (!fs.existsSync(webNodeModules) && !fs.existsSync(rootNodeModules)) {
+    console.log(`${C.yellow}⚡ First-run detected: Installing dependencies (vite, svelte)...${C.reset}`);
+    try {
+      execSync('npm install', { cwd: webDir, stdio: 'inherit' });
+    } catch (e) {}
+  }
+}
+
+function startBackendApi() {
+  try {
+    execSync('dotnet --version', { stdio: 'ignore' });
+    const apiDir = path.join(ROOT_DIR, 'src/05_DevUI/DNAPlatform.DevUI.API');
+    console.log(`${C.cyan}● Launching ASP.NET Core Backend API on http://localhost:5254...${C.reset}`);
+    apiProcess = spawn('dotnet', ['run', '--no-launch-profile', '--urls', 'http://127.0.0.1:5254'], {
+      cwd: apiDir,
+      stdio: 'inherit',
+      shell: true
+    });
+  } catch {
+    // Dotnet is containerized or not on local PATH
+  }
+}
 
 function renderBanner() {
   console.clear();
@@ -69,8 +101,11 @@ ${C.bold}Interactive Controls & Keybindings:${C.reset}
 }
 
 function startDevServer() {
+  ensureViteInstalled();
+  startBackendApi();
+
   const webDir = path.join(ROOT_DIR, 'src/05_DevUI/DNAPlatform.DevUI.Web');
-  console.log(`${C.green}● Launching DeNovoAutomata application stack...${C.reset}\n`);
+  console.log(`${C.green}● Launching DeNovoAutomata Web Studio on http://localhost:3000...${C.reset}\n`);
 
   devProcess = spawn('npm', ['run', 'dev'], {
     cwd: webDir,
@@ -80,7 +115,7 @@ function startDevServer() {
 
   devProcess.on('exit', (code) => {
     if (code !== 0 && code !== null) {
-      console.log(`\n${C.yellow}⚠ Server process exited with code ${code}${C.reset}`);
+      console.log(`\n${C.yellow}⚠ Web server process exited with code ${code}${C.reset}`);
     }
   });
 }
@@ -118,18 +153,16 @@ function setupKeybindings() {
       // Ctrl+C or 'q' or 'Q'
       if (key === '\u0003' || key.toLowerCase() === 'q') {
         console.log(`\n${C.yellow}Shutting down DeNovoAutomata...${C.reset}`);
-        if (devProcess) {
-          devProcess.kill();
-        }
+        if (devProcess) devProcess.kill();
+        if (apiProcess) apiProcess.kill();
         process.exit(0);
       }
 
       switch (key.toLowerCase()) {
         case 'r':
           console.log(`\n${C.cyan}↻ Restarting servers...${C.reset}`);
-          if (devProcess) {
-            devProcess.kill();
-          }
+          if (devProcess) devProcess.kill();
+          if (apiProcess) apiProcess.kill();
           setTimeout(() => {
             renderBanner();
             startDevServer();
@@ -170,5 +203,6 @@ startDevServer();
 process.on('SIGINT', () => {
   clearInterval(animInterval);
   if (devProcess) devProcess.kill();
+  if (apiProcess) apiProcess.kill();
   process.exit(0);
 });

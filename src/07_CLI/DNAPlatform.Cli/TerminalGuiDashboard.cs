@@ -33,6 +33,7 @@ namespace DNAPlatform.Cli
                 {
                     new MenuBarItem("_DeNovoAutomata", new MenuItem[]
                     {
+                        new MenuItem("_Start All (run-all)", "Launch DevUI & Backend", () => StartAllServers()),
                         new MenuItem("_Health Check", "Probe API status", async () => await CheckHealthAsync(baseUrl)),
                         new MenuItem("_Quit", "Exit TUI", () => Application.RequestStop(), null, null, Key.CtrlMask | Key.Q)
                     }),
@@ -70,11 +71,12 @@ namespace DNAPlatform.Cli
                     X = 2,
                     Y = 7,
                     Width = Dim.Fill() - 4,
-                    Height = 8
+                    Height = 9
                 };
 
                 var optionsList = new ListView(new string[]
                 {
+                    "[0] 🚀 Start All Servers (DevUI + .NET API + AG-UI) — run-all",
                     "[1] 🧪 Run Automated Agentic SmokeTest",
                     "[2] ⚡ Inspect AG-UI Protocol & Human-in-the-Loop Stream",
                     "[3] 🐍 Execute CSnakes Polyglot Biological Sequence Kernel",
@@ -92,15 +94,18 @@ namespace DNAPlatform.Cli
                     switch (a.Item)
                     {
                         case 0:
-                            MessageBox.Query("SmokeTest", "Run smoke test via CLI: 'dnaplatform smoketest' or 'npm run smoketest'.", "OK");
+                            StartAllServers();
                             break;
                         case 1:
-                            MessageBox.Query("AG-UI", "AG-UI Protocol active over SSE with Human-in-the-Loop authorization cards.", "OK");
+                            MessageBox.Query("SmokeTest", "Run smoke test via CLI: 'dnaplatform smoketest' or 'npm run smoketest'.", "OK");
                             break;
                         case 2:
-                            MessageBox.Query("CSnakes", "CSnakes Python-C# zero-copy bridge active in DNAPlatform.Core.", "OK");
+                            MessageBox.Query("AG-UI", "AG-UI Protocol active over SSE with Human-in-the-Loop authorization cards.", "OK");
                             break;
                         case 3:
+                            MessageBox.Query("CSnakes", "CSnakes Python-C# zero-copy bridge active in DNAPlatform.Core.", "OK");
+                            break;
+                        case 4:
                             MessageBox.Query("Clean", "Temporary cache and database journals cleaned.", "OK");
                             break;
                     }
@@ -124,6 +129,29 @@ namespace DNAPlatform.Cli
             finally
             {
                 Application.Shutdown();
+            }
+        }
+
+        private static void StartAllServers()
+        {
+            var choice = MessageBox.Query("Start All Servers", "Launch DeNovoAutomata system stack (DevUI :3000, API :5254, AG-UI :5000)?", "Launch", "Cancel");
+            if (choice == 0)
+            {
+                try
+                {
+                    var psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "node",
+                        Arguments = "scripts/3-denovo-automata.mjs",
+                        UseShellExecute = true
+                    };
+                    System.Diagnostics.Process.Start(psi);
+                    MessageBox.Query("Started", "DeNovoAutomata server stack launched successfully.", "OK");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Query("Launch Error", ex.Message, "OK");
+                }
             }
         }
 

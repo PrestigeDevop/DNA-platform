@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "vite dev --host 0.0.0.0 --port 3000",
-    "build": "prisma generate && vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 3000",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "dev": "npx vite dev --host 0.0.0.0 --port 3000",
+    "build": "npx prisma generate && npx vite build",
+    "preview": "npx vite preview --host 0.0.0.0 --port 3000",
+    "check": "npx svelte-kit sync && npx svelte-check --tsconfig ./tsconfig.json",
     "prisma:generate": "prisma generate",
     "prisma:db:push": "prisma db push",
     "prisma:studio": "prisma studio"

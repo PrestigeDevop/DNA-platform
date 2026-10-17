@@ -359,29 +359,40 @@ function runTui() {
 
   function showMenu() {
     console.log(`${COLORS.bold}Main Menu:${COLORS.reset}`);
-    console.log(`  ${COLORS.cyan}[1]${COLORS.reset} 🧪 Run Automated SmokeTest`);
-    console.log(`  ${COLORS.cyan}[2]${COLORS.reset} 🚀 Bootstrap Environment & SQLite Database`);
-    console.log(`  ${COLORS.cyan}[3]${COLORS.reset} 🧹 Clean Workspace Artifacts`);
-    console.log(`  ${COLORS.cyan}[4]${COLORS.reset} 📡 Probe Polyglot Environment (CSnakes & .NET)`);
-    console.log(`  ${COLORS.cyan}[5]${COLORS.reset} ⚡ Test AG-UI Protocol Stream`);
+    console.log(`  ${COLORS.green}[1]${COLORS.reset} 🚀 Start All Servers (DevUI + API + AG-UI) — run-all`);
+    console.log(`  ${COLORS.cyan}[2]${COLORS.reset} 🧪 Run Automated SmokeTest`);
+    console.log(`  ${COLORS.cyan}[3]${COLORS.reset} ⚙️ Bootstrap Toolchain & SQLite Database`);
+    console.log(`  ${COLORS.cyan}[4]${COLORS.reset} 🧹 Clean Workspace Artifacts`);
+    console.log(`  ${COLORS.cyan}[5]${COLORS.reset} 📡 Probe Polyglot Environment (CSnakes & .NET)`);
+    console.log(`  ${COLORS.cyan}[6]${COLORS.reset} ⚡ Test AG-UI Protocol Stream`);
     console.log(`  ${COLORS.cyan}[0]${COLORS.reset} 🚪 Exit\n`);
 
-    rl.question(`${COLORS.bold}Select an action [0-5]: ${COLORS.reset}`, async (answer) => {
+    rl.question(`${COLORS.bold}Select an action [0-6]: ${COLORS.reset}`, async (answer) => {
       console.log('');
       switch (answer.trim()) {
         case '1':
+        case 'start':
+        case 'run':
+          console.log(`${COLORS.green}Launching all servers (DeNovoAutomata run-all)...${COLORS.reset}\n`);
+          rl.close();
+          spawn('node', [path.join(ROOT_DIR, 'scripts/3-denovo-automata.mjs')], {
+            cwd: ROOT_DIR,
+            stdio: 'inherit'
+          });
+          return;
+        case '2':
           await runSmokeTest();
           break;
-        case '2':
+        case '3':
           await runBootstrap();
           break;
-        case '3':
+        case '4':
           runClean();
           break;
-        case '4':
+        case '5':
           await runEnv();
           break;
-        case '5':
+        case '6':
           console.log(`${COLORS.cyan}Connecting to AG-UI SSE Stream...${COLORS.reset}`);
           await runSmokeTest();
           break;
@@ -392,7 +403,7 @@ function runTui() {
           rl.close();
           return;
         default:
-          console.log(`${COLORS.yellow}Invalid option. Please choose 0-5.${COLORS.reset}`);
+          console.log(`${COLORS.yellow}Invalid option. Please choose 0-6.${COLORS.reset}`);
       }
 
       console.log('\n' + '─'.repeat(70) + '\n');

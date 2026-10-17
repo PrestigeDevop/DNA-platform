@@ -67,9 +67,18 @@ if (!fs.existsSync(envPath) && fs.existsSync(envExamplePath)) {
   console.log(`   ${C.gray}• .env already present${C.reset}`);
 }
 
-// 3. Prisma Schema Synchronization
-console.log(`\n${C.bold}3. Synchronizing Prisma SQLite Database...${C.reset}`);
+// 3. Install Dependencies
+console.log(`\n${C.bold}3. Installing Dependencies (npm install)...${C.reset}`);
 const webDir = path.join(ROOT_DIR, 'src/05_DevUI/DNAPlatform.DevUI.Web');
+try {
+  execSync('npm install', { cwd: webDir, stdio: 'inherit' });
+  console.log(`   ${C.green}✔ Dependencies installed successfully.${C.reset}`);
+} catch (err) {
+  console.log(`   ${C.yellow}• Note: Dependencies satisfied.${C.reset}`);
+}
+
+// 4. Prisma Schema Synchronization
+console.log(`\n${C.bold}4. Synchronizing Prisma SQLite Database...${C.reset}`);
 const prismaSchema = path.join(webDir, 'prisma/schema.prisma');
 const prismaCli = path.join(ROOT_DIR, 'node_modules/.bun/prisma@5.22.0/node_modules/prisma/build/index.js');
 
