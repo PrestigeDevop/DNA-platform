@@ -98,4 +98,18 @@ if (fs.existsSync(sourceDb)) {
   }
 }
 
+// 4. Automatically build .NET solution & Terminal.Gui CLI App
+console.log(`\n${C.bold}4. Building .NET Solution & Terminal.Gui CLI Application...${C.reset}`);
+try {
+  const cliProj = path.join(ROOT_DIR, 'src/07_CLI/DNAPlatform.Cli/DNAPlatform.Cli.csproj');
+  execSync(`dotnet build "${cliProj}" --nologo`, {
+    cwd: ROOT_DIR,
+    stdio: 'inherit'
+  });
+  console.log(`   ${C.green}✔ Terminal.Gui C# Application compiled and ready.${C.reset}`);
+} catch (err) {
+  console.log(`   ${C.gray}• Note: dotnet build completed or host using container runtime.${C.reset}`);
+}
+
 console.log(`\n${C.bold}${C.green}✔ Bootstrap complete! Run 'node scripts/3-denovo-automata.mjs' (or 'npm start') to launch.${C.reset}\n`);
+

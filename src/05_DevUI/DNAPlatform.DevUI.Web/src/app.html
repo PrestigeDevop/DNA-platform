@@ -3,6 +3,35 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      // Defensive polyfill for iframe sandboxes where window.fetch has only a getter
+      (function() {
+        try {
+          var orig = window.fetch ? window.fetch.bind(window) : null;
+          var cur = orig;
+          try {
+            Object.defineProperty(window, 'fetch', {
+              get: function() { return cur; },
+              set: function(fn) { cur = fn; },
+              configurable: true,
+              enumerable: true
+            });
+          } catch (e1) {
+            try {
+              var p = Object.getPrototypeOf(window);
+              if (p) {
+                Object.defineProperty(p, 'fetch', {
+                  get: function() { return cur; },
+                  set: function(fn) { cur = fn; },
+                  configurable: true,
+                  enumerable: true
+                });
+              }
+            } catch (e2) {}
+          }
+        } catch (e) {}
+      })();
+    </script>
     <title>DNA Platform - DevUI</title>
     <meta name="description" content="Low-Code/No-Code Bioinformatic Workflow Engine with Custom Skills and Agent Framework" />
     <meta property="og:title" content="DNA Platform - DevUI" />

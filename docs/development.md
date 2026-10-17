@@ -1,82 +1,86 @@
-# DeNovoAutomata — Development Guide & Activity Log
+# DeNovoAutomata — Development Guide, AGENTS & Platform Documentation
 
-> **Purpose**: This single document consolidates development history, completed phase milestones, active task backlog (TODO), and diagnostic logging guidelines for DeNovoAutomata.
-
----
-
-## 1. Development Log & Phase History
-
-### Phase 1: The Single Unified Orchestrator Engine (Completed)
-- Established `src/03_AgentWorkflowPatterns/DNAPlatform.AgentFramework` as the single authoritative workflow engine.
-- Implemented `WorkflowOrchestrator`, `AgentManager`, and `NodeExecutor`.
-- Verified with 8 automated xUnit tests in `src/09_Tests/DNAPlatform.Tests`.
-
-### Phase 2: Visual Designer & Persistence (Completed)
-- Built interactive drag-and-drop workflow canvas in SvelteKit (`src/lib/components/WorkflowDesigner.svelte`).
-- Configured SQLite persistence with Prisma schema for `Workflow`, `WorkflowVersion`, `Agent`, `Execution`, and `CustomSnippet`.
-- Wired CRUD endpoints in `/api/workflows`, `/api/agents`, `/api/executions`.
-
-### Phase 3: Structural Validation & Environment Verification (Completed)
-- Created `POST /api/workflows/validate` for acyclic graph (DAG) cycle detection and port connectivity checks.
-- Integrated `mise.toml` environment introspection (`GET /api/environment`) via `MiseService.cs`.
-
-### Phase 3.75: ACP (Agent Client Protocol) Adapter (Completed)
-- Implemented standalone Node.js/TypeScript ACP adapter in `src/08_ACP/`.
-- Maps stdio JSON-RPC protocol to the HTTP API on port 5254 with pure stdout discipline.
-
-### Phase 4: AG-UI Protocol Server & Human-in-the-Loop (HITL) (Completed)
-- Implemented official AG-UI protocol specification ([docs.ag-ui.com](https://docs.ag-ui.com/sdk/dotnet/hosting/overview)).
-- Hosted framework-agnostic AG-UI server in .NET 8 on port 5000 and mirror route in SvelteKit at `/api/agui`.
-- Full streaming lifecycle: `RUN_STARTED`, `THINKING_DELTA`, `TOOL_CALL_STARTED/FINISHED`, `APPROVAL_REQUESTED` (HITL Interrupt), `STATE_SNAPSHOT`, `STATE_DELTA` (JSON Patch), `TEXT_DELTA`, `RUN_FINISHED`.
-- Built interactive `AgUiStudio.svelte` component embedded on `/agents` with live operator authorization cards.
-
-### Phase 5: CSnakes Polyglot Python-C# Interop in Core (Completed)
-- Implemented in `src/01_Core/DNAPlatform.Core` (`CSnakes.cs` and `BioinformaticsTypes.cs`).
-- Zero-overhead in-process Python script and module execution for BioPython, NumPy, and biological algorithms.
-- Strongly-typed `DnaSequenceMetrics` calculations: GC content, GC skew, nucleotide frequencies, and reverse complements.
-- Pure C# fallback ensures continuous operation when host systems lack Python binaries.
-
-### Phase 6: Terminal.Gui Native TUI & 3 Focused Cross-Platform Scripts (Completed)
-- Added `Terminal.Gui` (gui.cs) to `src/07_CLI/DNAPlatform.Cli` with native windowed console studio (`TerminalGuiDashboard.cs`).
-- Replaced fragmented scripts with 3 focused, cross-platform runners:
-  - `scripts/1-bootstrap.mjs` (`npm run bootstrap`): First-time install & database setup.
-  - `scripts/2-test-dev.mjs` (`npm test`): Comprehensive 10-check E2E test suite with `--clean` pre-push artifact clean.
-  - `scripts/3-denovo-automata.mjs` (`npm start`): Animated, colored runner with instant < 1s boot and hotkey controls.
+> **Consolidated Platform Reference**: This document merges historical development logs, the AGENTS engineering guide, command-line usage specifications, gap analysis status, and roadmap.
 
 ---
 
-## 2. Active Task List (TODO)
+## 📖 Documentation & Platform Guide
 
-### Priority A: Additional Bioinformatic Skills
-- [ ] Add Multi-FASTA batch parser skill in `src/06_Skills/Bioinformatics/`.
-- [ ] Add IUPAC Degenerate Codon Translation Table skill.
-- [ ] Add Local BLAST query runner skill.
+### 1. The Single Unified Engine
+`DNAPlatform.AgentFramework` (`src/03_AgentWorkflowPatterns/DNAPlatform.AgentFramework`) is the **single** workflow and agent engine across the entire repository. The ASP.NET Core API, SvelteKit DevUI, the AG-UI server, and the CLI all bind to this one instance. There is no second orchestrator anywhere in the repository.
 
-### Priority B: Pre-Execution Environment Gating
-- [ ] Make `POST /api/environment/verify` block execution on `/api/workflows/[id]/execute` if any required tool runtime returns non-GREEN.
+### 2. Command Line Usage
 
-### Priority C: Durable Step Replay
-- [ ] Record intermediate node outputs to `Execution.nodeResults` for offline step replay and checkpointing.
+The platform provides dual CLI/TUI interfaces: the native C# executable `dnaplatform` (`src/07_CLI/DNAPlatform.Cli`) powered by **Terminal.Gui** and the cross-platform Node runner `scripts/dna.js` (aliased via `npm run cli`).
+
+#### Subcommands
+
+| Command | Usage | Description |
+|---|---|---|
+| `tui` | `dnaplatform tui`<br>`npm run tui` | Launches the interactive **Terminal.Gui** windowed console studio with menus, health monitor, and keybindings. |
+| `run` | `dnaplatform run <workflow-id>` | Executes a stored workflow through the API and prints per-node execution chips. |
+| `validate` | `dnaplatform validate <workflow-id>` | Runs structural DAG validation (cycle detection, port links) without executing compute. |
+| `status` | `dnaplatform status [--all]` | Queries recent execution status and timing metrics. |
+| `logs` | `dnaplatform logs [--limit 50]` | Streams real-time diagnostic log records from the backend ring buffer. |
+| `cancel` | `dnaplatform cancel <exec-id>` | Dispatches a cancellation request to abort a running workflow. |
+| `env` | `dnaplatform env` | Probes host toolchain and runtime status reported by the API. |
+| `smoketest` | `npm test`<br>`dnaplatform smoketest` | Runs the 10-point automated end-to-end verification suite. |
+| `bootstrap` | `npm run bootstrap`<br>`dnaplatform bootstrap` | Probes toolchain, restores dependencies, builds Terminal.Gui app, and synchronizes SQLite database. |
+| `clean` | `npm run test:clean`<br>`dnaplatform clean` | Cleans temporary build artifacts, SQLite journals, and cache files before Git push. |
+
+### 3. Response Envelope Conventions
+- **SvelteKit Routes**: Use lowercase singular/plural keys (`{ workflows }`, `{ workflow }`, `{ agents }`, `{ agent }`, `{ executions }`). JSON columns are pre-parsed into objects before returning to the frontend.
+- **ASP.NET Core Controllers**: Use PascalCase with counts (`{ Count, Skills }`, `{ Count, Workflows }`, `{ Success, SkillId, Data, ExecutedAt, DurationMs }`).
+- **Error Payloads**: `{ error }` on SvelteKit and `{ Message }` or `{ Success, Error }` on .NET.
+
+### 4. Persistence & Database Constraints
+- Persistence uses **Prisma with SQLite** (`src/05_DevUI/DNAPlatform.DevUI.Web/prisma/schema.prisma`).
+- **No Native JSON Type**: SQLite stores complex objects (`Workflow.nodes`, `Workflow.connections`, `Execution.nodeResults`) as `String` columns. Always serialize/deserialize at the route boundary.
+- **Database Path**: `DATABASE_URL` must use the `file:` scheme. Normalized automatically by `src/lib/server/db.ts`.
+
+### 5. Extension Recipes
+- **New Node Type**: Add string to the `NodeTypes` array in `Program.cs`, then register in `WorkflowDesigner.svelte` palette and inspector.
+- **New Skill**: Add class under `src/06_Skills/BuiltIn/` or `src/06_Skills/Bioinformatics/`; self-registers through `DNAPlatform.Skills.SkillRegistry`.
+- **New Proxied Route**: Add path to `vite.config.ts` `server.proxy`, otherwise SvelteKit will capture and 404 before reaching .NET.
 
 ---
 
-## 3. Diagnostic & Logging Reference
+## 🧪 Current Status & Gap Analysis
 
-DeNovoAutomata maintains an in-memory and file-backed diagnostic log ring buffer accessible via:
-- **API Endpoint**: `GET /api/logs?sinceId=0&limit=100`
-- **Web UI**: `/logs` (with live console capture and filtering)
-- **Log Levels**: `Information`, `Warning`, `Error`
-- **Categories**: `WorkflowOrchestrator`, `AGUI`, `PolyglotKernel`, `MiseService`, `SkillRegistry`
+All baseline platform capabilities, AG-UI protocol streaming, CSnakes polyglot interop, Terminal.Gui TUI, and cross-platform scripting are 100% operational.
+
+### Achieved ✅
+
+- ✅ **ACP adapter** (`src/08_ACP/`) — Thin Node/TypeScript adapter over the HTTP API using `@agentclientprotocol/sdk`. Maps `initialize`, `session/new`, `session/prompt`, and `session/cancel` to `:5254`. Pure stdout discipline for JSON-RPC frames with stderr diagnostic logging.
+- ✅ **CSnakes Polyglot in Core** (`src/01_Core/DNAPlatform.Core/`) — Zero-overhead Python/BioPython and C# interop. High-speed biological sequence metrics (`DnaSequenceMetrics`), GC content, GC skew, and reverse complements.
+- ✅ **AG-UI Protocol & Human-in-the-Loop** (`src/05_DevUI/DNAPlatform.DevUI.AGUI/`) — Server-Sent Events streaming server supporting `RUN_STARTED`, `THINKING_DELTA`, `APPROVAL_REQUESTED` interrupts, `STATE_SNAPSHOT`, `STATE_DELTA` (JSON Patch), and `RUN_FINISHED`. Includes interactive operator authorization cards in the DevUI.
+- ✅ **Native C# Terminal.Gui TUI** (`src/07_CLI/DNAPlatform.Cli/`) — Windowed console interface using Miguel de Icaza's `Terminal.Gui` (`gui.cs`) with MenuBar, StatusBar, ColorScheme, and ListView. Automatically compiled on bootstrap.
+- ✅ **The 3 Focused Cross-Platform Scripts** (`scripts/`):
+  - `1-bootstrap.mjs` (`npm run bootstrap`): Toolchain check, dependencies install, Terminal.Gui build, and database initialization.
+  - `2-test-dev.mjs` (`npm test`): 10-check E2E suite with `--clean` pre-push artifact cleaner.
+  - `3-denovo-automata.mjs` (`npm start`): Animated, instant runner with keybindings (`[R]`estart, `[T]`est, `[C]`lean, `[L]`ogs, `[O]`pen, `[Q]`uit).
+- ✅ **Visual DAG Workflow Designer** — SvelteKit WYSIWYG canvas with cycle detection, parallel execution chips, and node connection editing.
+- ✅ **Skill Catalog & Clock Provider** — Needleman-Wunsch sequence alignment, IUPAC genetic sequence validation, and microsecond-precision C# clock providers.
 
 ---
 
-## 4. Verification Gate
+## 🛣️ Roadmap
 
-Before committing code or submitting pull requests, run:
+*(Future enhancements will be scheduled strictly based on explicit user requests and requirements.)*
+
+- **Prospective Capability 1: Multi-FASTA Batch Pipeline Processing**: Adding streaming batch sequence loaders for multi-megabase genomic FASTA records.
+- **Prospective Capability 2: Codon Optimization & Translation Tables**: Adding native NCBI translation tables (Bacterial, Mitochondrial, Standard Nuclear).
+- **Prospective Capability 3: Distributed FSM State Machine Nodes**: Enabling pause-and-resume workflow checkpointing across container restarts.
+
+---
+
+## 🔬 Verification Gate
+
+Run the automated test suite before any Git commit or push:
 ```bash
 # Run full automated test suite (10 checks)
 npm test
 
-# Run tests and clean build artifacts before Git push
+# Run tests and clean workspace artifacts before Git push
 npm run test:clean
 ```

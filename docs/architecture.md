@@ -142,6 +142,38 @@ The platform natively hosts the **AG-UI Protocol** (`https://docs.ag-ui.com/sdk/
    - `5254`: ASP.NET Core 8 Web API.
    - `5000`: AG-UI SSE Protocol Server.
 
+### Access Points
+
+| Component / Interface | URL / Binding | Protocol | Key Endpoints |
+|---|---|---|---|
+| **SvelteKit Web Studio** | `http://localhost:3000` (or `:5173`) | HTTP / HTML5 | `/workflows`, `/agents`, `/skills`, `/executions`, `/logs` |
+| **ASP.NET Core 8 Backend** | `http://localhost:5254` | HTTP / REST | `/swagger`, `/health`, `/api/info`, `/api/environment`, `/api/skills` |
+| **AG-UI Protocol Server** | `http://localhost:5000` | HTTP / SSE | `/api/agui` (Server-Sent Events streaming with HITL interrupts) |
+| **Terminal.Gui C# TUI** | Console (`npm run tui` or `dnaplatform tui`) | stdio / Terminal | Windowed TUI dashboard with menu, health probe, and status bar |
+| **ACP Adapter** | `src/08_ACP` (`node dist/index.js`) | stdio / JSON-RPC | `initialize`, `session/new`, `session/prompt`, `session/cancel` |
+| **Polyglot CSnakes Kernel** | `http://localhost:3000/api/polyglot/execute` | HTTP POST | Python 3, C# Interactive, JavaScript, and Bash cell execution |
+
+### Troubleshooting
+
+1. **Port Conflicts (`address already in use`)**:
+   - Backend (:5254) or AG-UI (:5000) or Web (:3000) is held by an orphaned background process.
+   - **Fix on Linux/macOS**: `lsof -i :5254` then `kill -9 <PID>`.
+   - **Fix on Windows**: `netstat -ano | findstr :5254` then `taskkill /PID <PID> /F`.
+   - Or run the pre-clean command: `npm run test:clean` / `node scripts/2-test-dev.mjs --clean`.
+
+2. **SQLite `file:` Protocol Validation (`Error validating datasource db`)**:
+   - Prisma's SQLite connector strictly requires the `file:` scheme.
+   - `src/lib/server/db.ts` automatically normalizes `process.env.DATABASE_URL` to `file:<absolute_path>/dev.db`.
+   - If resetting manually: run `npm run bootstrap` to regenerate and push the schema.
+
+3. **Linux Globalization (ICU missing)**:
+   - Exception: `Process terminated. Couldn't find a valid ICU package on that assembly`.
+   - **Fix**: Export `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` before launching dotnet or use `mise run dev`.
+
+4. **SvelteKit Route Shadowing & Vite Proxy**:
+   - SvelteKit server routes (`src/routes/api/...`) take precedence over Vite's `server.proxy`.
+   - If a route returns unexpected data or 404, verify whether it is handled by SvelteKit's Prisma handlers or proxied to .NET in `src/05_DevUI/DNAPlatform.DevUI.Web/vite.config.ts`.
+
 ---
 
 ## 7. Final Intent Summarized

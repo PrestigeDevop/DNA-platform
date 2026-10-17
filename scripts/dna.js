@@ -434,7 +434,16 @@ switch (command) {
   case 'tui':
   case 'menu':
   case 'dashboard':
-    runTui();
+  case 'gui':
+    try {
+      execSync('dotnet --version', { stdio: 'ignore' });
+      const cliProj = path.join(ROOT_DIR, 'src/07_CLI/DNAPlatform.Cli/DNAPlatform.Cli.csproj');
+      console.log(`${COLORS.cyan}Launching Native C# Terminal.Gui Studio (DNAPlatform.Cli)...${COLORS.reset}\n`);
+      const child = spawn('dotnet', ['run', '--project', cliProj, '--', 'tui'], { stdio: 'inherit', cwd: ROOT_DIR });
+      child.on('error', () => runTui());
+    } catch {
+      runTui();
+    }
     break;
 
   case 'help':
