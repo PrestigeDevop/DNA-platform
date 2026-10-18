@@ -367,20 +367,13 @@ return {
     >
       🔬 Execute MCP Tool
     </button>
-    <button
+    <a
+      href="/kernel"
       class="tab-btn"
-      class:active={activeTab === 'polyglot'}
-      on:click={() => (activeTab = 'polyglot')}
+      style="color: #38bdf8; text-decoration: none; border-color: #0284c7; font-weight: 600;"
     >
-      📓 Polyglot Kernel (Jupyter)
-    </button>
-    <button
-      class="tab-btn"
-      class:active={activeTab === 'author'}
-      on:click={() => (activeTab = 'author')}
-    >
-      ✍️ Authoring Studio
-    </button>
+      💻 Kernel & Component Studio ↗
+    </a>
   </div>
 
   <!-- TAB 1: market_place -->
@@ -553,120 +546,18 @@ return {
       </div>
     </div>
 
-  <!-- TAB 4: POLYGLOT JUPYTER KERNEL -->
-  {:else if activeTab === 'polyglot'}
-    <div class="polyglot-view">
-      <div class="polyglot-header">
-        <div>
-          <h3>📓 {notebookTitle}</h3>
-          <p class="subtitle">Polyglot .NET Interactive / Jupyter Runtime (C#, Python, Node.js)</p>
-        </div>
-        <div class="polyglot-actions">
-          <button class="btn secondary" on:click={() => addCell('csharp')}>+ C# Cell</button>
-          <button class="btn secondary" on:click={() => addCell('python')}>+ Python Cell</button>
-          <button class="btn secondary" on:click={() => addCell('javascript')}>+ Node.js Cell</button>
-        </div>
-      </div>
-
-      {#if loadingNotebook}
-        <div class="loading">Loading notebook cells...</div>
-      {:else}
-        <div class="notebook-cells">
-          {#each notebookCells as cell, idx}
-            <div class="cell-card">
-              <div class="cell-head">
-                <span class="cell-index">[{idx + 1}]</span>
-                <span class="cell-lang badge-{cell.language}">{cell.language.toUpperCase()}</span>
-                {#if cell.durationMs}
-                  <span class="cell-dur">{cell.durationMs} ms</span>
-                {/if}
-                <button
-                  class="btn-run"
-                  on:click={() => runCell(cell)}
-                  disabled={cell.running}
-                >
-                  {cell.running ? 'Running...' : '▶ Run Cell'}
-                </button>
-              </div>
-
-              <textarea class="cell-editor" rows="4" bind:value={cell.source}></textarea>
-
-              {#if cell.output}
-                <div class="cell-output">
-                  <div class="output-label">Output:</div>
-                  <pre>{cell.output}</pre>
-                </div>
-              {/if}
-            </div>
-          {/each}
-        </div>
-      {/if}
-    </div>
-
-  <!-- TAB 5: AUTHORING STUDIO -->
-  {:else if activeTab === 'author'}
-    <div class="authoring-view">
-      <div class="author-card">
-        <h3>✍️ Author Custom Skill or Smart Component</h3>
-        <p class="subtitle">
-          Create new bioinformatic modules or smart components annotated by Microsoft Copilot, published live into market_place.
-        </p>
-
-        <div class="form-grid">
-          <div class="field">
-            <label>Component / Skill Name</label>
-            <input type="text" bind:value={authorName} placeholder="e.g. DNA Splice Junction Detector" />
-          </div>
-
-          <div class="field">
-            <label>Category</label>
-            <select bind:value={authorCategory}>
-              <option value="Bioinformatics">Bioinformatics</option>
-              <option value="Smart Component">Smart Component</option>
-              <option value="AI & Inference">AI & Inference</option>
-              <option value="System & Utility">System & Utility</option>
-            </select>
-          </div>
-
-          <div class="field">
-            <label>Icon</label>
-            <input type="text" bind:value={authorIcon} style="width: 60px;" />
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Logic Script (JavaScript / C# Interop)</label>
-          <textarea rows="9" bind:value={authorScript} class="code-textarea"></textarea>
-          <span class="hint-text">
-            Microsoft Copilot automatically infers parameter schemas and attaches execution hooks.
-          </span>
-        </div>
-
-        <div class="author-actions">
-          <button
-            class="btn primary"
-            on:click={onAuthorSkill}
-            disabled={authoringSaving}
-          >
-            {authoringSaving ? 'Registering with Copilot...' : '🚀 Register & Publish to market_place'}
-          </button>
-        </div>
-      </div>
-    </div>
-  {/if}
-
-  <!-- IMPORT MODAL -->
-  {#if showImportModal}
-    <div class="modal-backdrop">
-      <div class="modal-card">
-        <h3>Import MCP Server Manifest</h3>
-        <p class="hint">Provide server specification JSON:</p>
-        <textarea rows="10" bind:value={importText}></textarea>
-        <div class="modal-actions">
-          <button class="btn secondary" on:click={() => (showImportModal = false)}>Cancel</button>
-          <button class="btn primary" on:click={onImportManifest}>Import Server</button>
-        </div>
-      </div>
+  <!-- REDIRECT BANNER TO DEDICATED /kernel PAGE -->
+  {:else if activeTab === 'polyglot' || activeTab === 'author'}
+    <div class="polyglot-view" style="text-align: center; padding: 4rem 1rem;">
+      <h3 style="font-size: 1.4rem; color: #f8fafc; margin-bottom: 0.5rem;">
+        💻 Polyglot Kernel & Component Studio has moved!
+      </h3>
+      <p style="color: #94a3b8; max-width: 600px; margin: 0 auto 1.5rem auto;">
+        The interactive multi-language kernel (real C#, Python CSnakes, JavaScript, Shell), Unity-style Smart Component authoring, and real-time Agent testing lab are now consolidated on the dedicated <strong>/kernel</strong> page.
+      </p>
+      <a href="/kernel" class="btn primary" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.75rem; font-weight: 600; border-radius: 6px;">
+        Open Kernel & Studio ↗
+      </a>
     </div>
   {/if}
 </div>

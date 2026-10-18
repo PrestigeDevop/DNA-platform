@@ -138,6 +138,7 @@
 
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
+    loadCustomComponentsList();
     window.addEventListener('keydown', onKeyDown);
   });
 
@@ -669,6 +670,255 @@
     setTimeout(() => (message = ''), 3000);
   }
 
+
+  // --------------------------------------------------------------------------
+  // SMART COMPONENT INSPECTOR & INLINE EXPRESSION ENGINE (n8n / Elsa Style)
+  // --------------------------------------------------------------------------
+  let showNodeDrawer = false;
+  let inspectingNode: any = null;
+  let inspectingNodeProps: Array<{ name: string; type: string; default: any; value: any; min?: number; max?: number; step?: number; description?: string }> = [];
+  let customComponentsList: any[] = [];
+  let selectedComponentId = '';
+  let inlineExpressionCode = '';
+  let testInputJson = '{\n  "sequence": "ATGCGATCGATC",\n  "gc": 0.50,\n  "length": 12,\n  "quality": 0.95\n}';
+  let testOutputResult = '';
+  let testOutputError = '';
+
+  // Visual FSM authoring state
+  let showAddStateModal = false;
+  let newFsmStateName = '';
+  let newFsmStateType: 'entry' | 'state' | 'exit' = 'state';
+  let showAddTransModal = false;
+  let newTransFrom = '';
+  let newTransTo = '';
+  let newTransTrigger = 'OnEvent';
+  let newTransCondition = 'true';
+
+  async function loadCustomComponentsList() {
+    try {
+      const res = await fetch('/api/components');
+      if (res.ok) {
+        const data = await res.json();
+        customComponentsList = data.components || [];
+      }
+    } catch (e) {
+      console.warn('Could not fetch custom components catalog', e);
+    }
+  }
+
+  function openNodeSmartConfig(node: any) {
+    if (!node) return;
+    selectedId = node.id;
+    inspectingNode = JSON.parse(JSON.stringify(node));
+    inlineExpressionCode = inspectingNode.config?.expression || inspectingNode.expression || '';
+    selectedComponentId = inspectingNode.config?.componentId || '';
+
+    // Load custom properties
+    const props = inspectingNode.config?.customProperties || inspectingNode.customProperties || [];
+    inspectingNodeProps = Array.isArray(props) ? JSON.parse(JSON.stringify(props)) : [];
+
+    testOutputResult = '';
+    testOutputError = '';
+    showNodeDrawer = true;
+
+    if (customComponentsList.length === 0) {
+      loadCustomComponentsList();
+    }
+  }
+
+  function closeNodeSmartConfig() {
+    showNodeDrawer = false;
+    inspectingNode = null;
+    testOutputResult = '';
+    testOutputError = '';
+  }
+
+  function onSelectCustomComponent(compId: string) {
+    selectedComponentId = compId;
+    if (!compId || !inspectingNode) return;
+    const comp = customComponentsList.find((c) => c.id === compId);
+    if (!comp) return;
+
+    inspectingNode.name = comp.name;
+    inspectingNode.desc = comp.description;
+    inspectingNode.type = 'SmartComponent';
+    if (!inspectingNode.config) inspectingNode.config = {};
+    inspectingNode.config.componentId = comp.id;
+    inspectingNode.config.componentName = comp.name;
+    inspectingNode.config.category = comp.category;
+
+    if (comp.expression && !inlineExpressionCode) {
+      inlineExpressionCode = comp.expression;
+    }
+
+    if (Array.isArray(comp.properties)) {
+      inspectingNodeProps = comp.properties.map((p: any) => ({
+        name: p.name,
+        type: p.type || 'string',
+        default: p.default,
+        value: p.default,
+        min: p.min,
+        max: p.max,
+        step: p.step,
+        description: p.description
+      }));
+    }
+  }
+
+  function addCustomProperty() {
+    inspectingNodeProps = [
+      ...inspectingNodeProps,
+      {
+        name: `Property_${inspectingNodeProps.length + 1}`,
+        type: 'string',
+        default: 'value',
+        value: 'value',
+        description: 'Custom public attribute'
+      }
+    ];
+  }
+
+  function removeCustomProperty(idx: number) {
+    inspectingNodeProps = inspectingNodeProps.filter((_, i) => i !== idx);
+  }
+
+  function testNodeExpression() {
+    testOutputResult = '';
+    testOutputError = '';
+    try {
+      let parsedInput: any = {};
+      try {
+        parsedInput = JSON.parse(testInputJson);
+      } catch (jsonErr: any) {
+        testOutputError = `Invalid Test Input JSON: ${jsonErr.message}`;
+        return;
+      }
+
+      const properties: Record<string, any> = {};
+      for (const p of inspectingNodeProps) {
+        properties[p.name] = p.value !== undefined ? p.value : p.default;
+      }
+
+      let rawExpr = inlineExpressionCode.trim();
+      if (rawExpr.startsWith('{{') && rawExpr.endsWith('}}')) {
+        rawExpr = rawExpr.slice(2, -2).trim();
+      }
+
+      if (!rawExpr) {
+        testOutputResult = '// (Empty expression - passes input through unmodified)\n' + JSON.stringify(parsedInput, null, 2);
+        return;
+      }
+
+      const exprFn = new Function('$input', 'input', 'properties', 'props', `"use strict";\nreturn (${rawExpr});`);
+      const res = exprFn(parsedInput, parsedInput, properties, properties);
+      testOutputResult = typeof res === 'object' ? JSON.stringify(res, null, 2) : String(res);
+    } catch (evalErr: any) {
+      testOutputError = `Evaluation Error: ${evalErr.message}`;
+    }
+  }
+
+  function saveNodeSmartConfig() {
+    if (!inspectingNode) return;
+    const idx = nodes.findIndex((n) => n.id === inspectingNode.id);
+    if (idx !== -1) {
+      if (!nodes[idx].config) nodes[idx].config = {};
+      nodes[idx].name = inspectingNode.name;
+      nodes[idx].config.expression = inlineExpressionCode;
+      nodes[idx].config.customProperties = inspectingNodeProps;
+      nodes[idx].config.componentId = selectedComponentId;
+      if (inspectingNode.config?.category) {
+        nodes[idx].config.category = inspectingNode.config.category;
+      }
+      nodes = [...nodes];
+    }
+    showNodeDrawer = false;
+    message = `Updated Smart Component & Expression for "${inspectingNode.name}"`;
+    setTimeout(() => (message = ''), 3500);
+  }
+
+  function addCustomComponentNode(comp: any) {
+    const id = 'node_' + Math.random().toString(36).slice(2, 7);
+    const offset = (nodes.length % 6) * 30;
+    const newNode = {
+      id,
+      name: comp.name,
+      type: 'SmartComponent',
+      x: 280 + offset,
+      y: 120 + offset,
+      config: {
+        componentId: comp.id,
+        componentName: comp.name,
+        category: comp.category,
+        expression: comp.expression || '',
+        customProperties: (comp.properties || []).map((p: any) => ({
+          name: p.name,
+          type: p.type || 'string',
+          default: p.default,
+          value: p.default,
+          min: p.min,
+          max: p.max,
+          step: p.step,
+          description: p.description
+        }))
+      }
+    };
+    nodes = [...nodes, newNode];
+    selectedId = id;
+    message = `Added "${comp.name}" [${comp.category}] to canvas flow!`;
+    setTimeout(() => (message = ''), 3000);
+  }
+
+  function addFsmState() {
+    if (!newFsmStateName.trim()) return;
+    const id = 's_' + Date.now().toString(36).slice(-4);
+    const lastState = fsmStates[fsmStates.length - 1];
+    const newX = lastState ? lastState.x + 180 : 100;
+    const newY = lastState ? lastState.y : 80;
+    fsmStates = [
+      ...fsmStates,
+      {
+        id,
+        name: newFsmStateName.trim(),
+        type: newFsmStateType,
+        x: newX,
+        y: newY
+      }
+    ];
+    newFsmStateName = '';
+    showAddStateModal = false;
+    message = `Added FSM state: ${id}`;
+    setTimeout(() => (message = ''), 2500);
+  }
+
+  function deleteFsmState(stateId: string) {
+    if (fsmStates.length <= 1) return;
+    fsmStates = fsmStates.filter((s) => s.id !== stateId);
+    fsmTransitions = fsmTransitions.filter((t) => t.from !== stateId && t.to !== stateId);
+    if (activeFsmState === stateId) {
+      activeFsmState = fsmStates[0].id;
+    }
+  }
+
+  function addFsmTransition() {
+    if (!newTransFrom || !newTransTo) return;
+    fsmTransitions = [
+      ...fsmTransitions,
+      {
+        from: newTransFrom,
+        to: newTransTo,
+        trigger: newTransTrigger || 'OnEvent',
+        condition: newTransCondition || 'true'
+      }
+    ];
+    showAddTransModal = false;
+    message = `Added FSM transition from ${newTransFrom} to ${newTransTo}`;
+    setTimeout(() => (message = ''), 2500);
+  }
+
+  function deleteFsmTransition(idx: number) {
+    fsmTransitions = fsmTransitions.filter((_, i) => i !== idx);
+  }
+
   function onClose() {
     dispatch('close');
   }
@@ -698,7 +948,7 @@
         class:active={activeView === 'statemachine'}
         on:click={() => (activeView = 'statemachine')}
       >
-        🎮 Unity State Machine
+        🎮 State Machine (AG-UI FSM)
       </button>
       <button
         type="button"
@@ -765,6 +1015,30 @@
               </div>
             </div>
           {/each}
+
+          {#if customComponentsList.length > 0}
+            <div class="palette-divider"></div>
+            <div class="palette-section-title">
+              <span>🧩 Authored Components</span>
+              <span class="badge-count">{customComponentsList.length}</span>
+            </div>
+            {#each customComponentsList as comp}
+              <div
+                class="palette-card comp-card"
+                on:click={() => addCustomComponentNode(comp)}
+                title="Click to add authored smart component"
+              >
+                <span class="palette-icon">🧩</span>
+                <div class="palette-info">
+                  <div class="comp-title-row">
+                    <span class="palette-label">{comp.name}</span>
+                    <span class="cat-pill">{comp.category}</span>
+                  </div>
+                  <span class="palette-desc">{comp.description || 'Authored Smart Component'}</span>
+                </div>
+              </div>
+            {/each}
+          {/if}
         </div>
       </aside>
 
@@ -831,6 +1105,7 @@
               class:selected={selectedId === node.id}
               style="left:{node.x}px; top:{node.y}px; width:{NODE_W}px; height:{NODE_H}px; border-color:{meta.color}"
               on:mousedown={(e) => onNodeMouseDown(e, node)}
+              on:dblclick={() => openNodeSmartConfig(node)}
             >
               <div
                 class="node-header"
@@ -838,7 +1113,23 @@
               >
                 <span class="node-icon">{meta.icon}</span>
                 <span class="node-name" title={node.name}>{node.name || meta.label}</span>
-                <span class="node-type" style="color:{meta.color}">{meta.label}</span>
+                <div class="node-actions-row">
+                  {#if node.config?.expression}
+                    <span class="expr-badge" title="Has Inline Expression">ƒ(x)</span>
+                  {/if}
+                  {#if node.config?.componentId}
+                    <span class="comp-badge" title="Linked to Authored Smart Component">🧩</span>
+                  {/if}
+                  <button
+                    type="button"
+                    class="node-gear-btn"
+                    title="Configure Smart Component & Expressions (Double-click node also opens this)"
+                    on:click|stopPropagation={() => openNodeSmartConfig(node)}
+                  >
+                    ⚙️
+                  </button>
+                  <span class="node-type" style="color:{meta.color}">{meta.label}</span>
+                </div>
               </div>
 
               <div class="node-body">
@@ -1234,7 +1525,7 @@
   {:else if activeView === 'statemachine'}
     <div class="fsm-view">
       <div class="fsm-sidebar">
-        <div class="fsm-section-title">FSM Layers (Unity-Style)</div>
+        <div class="fsm-section-title">FSM Layers (Hierarchical)</div>
         <div class="layers-list">
           {#each fsmLayers as l}
             <button
@@ -1255,8 +1546,77 @@
           <div class="param-row"><span>trigger</span><code>Event = OnStart</code></div>
         </div>
 
-        <button class="btn primary" style="margin-top: auto;" on:click={stepFsm}>
-          ▶ Step State Transition
+        <div class="fsm-authoring-tools">
+          <div class="fsm-section-title">State Machine Authoring</div>
+          <div class="fsm-tool-buttons">
+            <button class="tool-btn" on:click={() => (showAddStateModal = !showAddStateModal)}>
+              ➕ Add State
+            </button>
+            <button class="tool-btn" on:click={() => (showAddTransModal = !showAddTransModal)}>
+              ↗ Add Transition
+            </button>
+          </div>
+
+          {#if showAddStateModal}
+            <div class="fsm-modal-box">
+              <h4>New FSM State</h4>
+              <input
+                type="text"
+                placeholder="State Name (e.g. QC_Check)"
+                bind:value={newFsmStateName}
+                class="fsm-input"
+              />
+              <select bind:value={newFsmStateType} class="fsm-select">
+                <option value="state">Standard State</option>
+                <option value="entry">Entry State</option>
+                <option value="exit">Exit State</option>
+              </select>
+              <div class="modal-actions">
+                <button class="btn-sm" on:click={() => (showAddStateModal = false)}>Cancel</button>
+                <button class="btn-sm primary" on:click={addFsmState}>Create</button>
+              </div>
+            </div>
+          {/if}
+
+          {#if showAddTransModal}
+            <div class="fsm-modal-box">
+              <h4>New Transition</h4>
+              <label>From State</label>
+              <select bind:value={newTransFrom} class="fsm-select">
+                <option value="">Select source...</option>
+                {#each fsmStates as s}
+                  <option value={s.id}>{s.name} ({s.id})</option>
+                {/each}
+              </select>
+              <label>To State</label>
+              <select bind:value={newTransTo} class="fsm-select">
+                <option value="">Select destination...</option>
+                {#each fsmStates as s}
+                  <option value={s.id}>{s.name} ({s.id})</option>
+                {/each}
+              </select>
+              <input
+                type="text"
+                placeholder="Trigger (e.g. OnQualityPassed)"
+                bind:value={newTransTrigger}
+                class="fsm-input"
+              />
+              <input
+                type="text"
+                placeholder="Condition (e.g. score >= 0.85)"
+                bind:value={newTransCondition}
+                class="fsm-input"
+              />
+              <div class="modal-actions">
+                <button class="btn-sm" on:click={() => (showAddTransModal = false)}>Cancel</button>
+                <button class="btn-sm primary" on:click={addFsmTransition}>Add</button>
+              </div>
+            </div>
+          {/if}
+        </div>
+
+        <button class="btn primary" style="margin-top: 1rem;" on:click={stepFsm}>
+          ▶ Step State Transition (AG-UI)
         </button>
       </div>
 
@@ -1354,6 +1714,194 @@
             🚀 Add Component to Canvas Flow
           </button>
         </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- SLIDE-OVER DRAWER: NODE SMART COMPONENT & INLINE EXPRESSION ENGINE -->
+  {#if showNodeDrawer && inspectingNode}
+    <div class="drawer-overlay" on:click={closeNodeSmartConfig}></div>
+    <div class="drawer-panel" role="dialog" aria-label="Smart Component & Expression Inspector">
+      <div class="drawer-header">
+        <div class="drawer-title-group">
+          <span class="drawer-icon">{getMeta(inspectingNode.type).icon}</span>
+          <div>
+            <h3>Configure: {inspectingNode.name || inspectingNode.id}</h3>
+            <span class="drawer-subtitle">Smart Component Inspector & Expression Engine (n8n / Elsa Style)</span>
+          </div>
+        </div>
+        <button class="close-drawer-btn" on:click={closeNodeSmartConfig}>✕</button>
+      </div>
+
+      <div class="drawer-content">
+        <!-- 1. GENERAL & IDENTIFIER -->
+        <section class="drawer-section">
+          <div class="section-badge">1. Node Identity</div>
+          <div class="field-grid">
+            <div class="field">
+              <label>Node Name</label>
+              <input type="text" bind:value={inspectingNode.name} placeholder="Descriptive Node Name" />
+            </div>
+            <div class="field">
+              <label>Node Type</label>
+              <input type="text" value={inspectingNode.type} disabled class="disabled-input" />
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. LINK AUTHORED SMART COMPONENT -->
+        <section class="drawer-section">
+          <div class="section-badge">2. Authored Component Link</div>
+          <div class="field">
+            <label>Link to Pre-Authored Smart Component</label>
+            <select
+              value={selectedComponentId}
+              on:change={(e) => onSelectCustomComponent(e.currentTarget.value)}
+            >
+              <option value="">-- Standalone Node (No linked component) --</option>
+              {#each customComponentsList as comp}
+                <option value={comp.id}>
+                  [{comp.category}] {comp.name} ({comp.properties?.length || 0} props)
+                </option>
+              {/each}
+            </select>
+            <p class="field-hint">
+              Selecting an authored component auto-populates its Unity-style serialized public properties and inline expressions.
+            </p>
+          </div>
+        </section>
+
+        <!-- 3. UNITY-STYLE SERIALIZED PUBLIC PROPERTIES -->
+        <section class="drawer-section">
+          <div class="section-header-row">
+            <div class="section-badge">3. Public Properties (Inspector)</div>
+            <button class="btn-add-prop" on:click={addCustomProperty}>+ Add Property</button>
+          </div>
+
+          {#if inspectingNodeProps.length === 0}
+            <div class="empty-props-box">
+              No custom public properties configured. Click "+ Add Property" or select an authored component above.
+            </div>
+          {:else}
+            <div class="props-inspector">
+              {#each inspectingNodeProps as prop, idx}
+                <div class="prop-row">
+                  <div class="prop-meta">
+                    <input
+                      type="text"
+                      bind:value={prop.name}
+                      class="prop-name-input"
+                      placeholder="Property Name"
+                    />
+                    <select bind:value={prop.type} class="prop-type-select">
+                      <option value="string">string</option>
+                      <option value="number">number</option>
+                      <option value="boolean">boolean</option>
+                      <option value="select">select</option>
+                    </select>
+                    <button
+                      type="button"
+                      class="prop-del-btn"
+                      on:click={() => removeCustomProperty(idx)}
+                      title="Remove property"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <!-- Dynamic Input Widget based on type -->
+                  <div class="prop-widget">
+                    {#if prop.type === 'boolean'}
+                      <label class="switch-row">
+                        <input type="checkbox" bind:checked={prop.value} />
+                        <span>{prop.value ? 'True (Enabled)' : 'False (Disabled)'}</span>
+                      </label>
+                    {:else if prop.type === 'number'}
+                      {#if prop.min !== undefined && prop.max !== undefined}
+                        <div class="slider-row">
+                          <input
+                            type="range"
+                            min={prop.min}
+                            max={prop.max}
+                            step={prop.step || 0.05}
+                            bind:value={prop.value}
+                          />
+                          <span class="slider-val">{prop.value}</span>
+                        </div>
+                      {:else}
+                        <input type="number" bind:value={prop.value} class="prop-input" />
+                      {/if}
+                    {:else}
+                      <input type="text" bind:value={prop.value} class="prop-input" />
+                    {/if}
+                  </div>
+
+                  {#if prop.description}
+                    <div class="prop-desc">{prop.description}</div>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </section>
+
+        <!-- 4. INLINE EXPRESSION ENGINE (n8n & Elsa Workflows Style) -->
+        <section class="drawer-section">
+          <div class="section-badge">4. Inline Expression Engine (n8n / Elsa Style)</div>
+          <p class="field-hint">
+            Write reactive expressions evaluated dynamically during execution. Available variables: <code>$input</code> (incoming payload) and <code>properties</code> (configured public fields). Template syntax <code>{`{{ ... }}`}</code> is supported.
+          </p>
+
+          <div class="expression-editor-box">
+            <div class="editor-header-bar">
+              <span>JavaScript Expression</span>
+              <span class="syntax-hint">e.g. <code>$input.gc >= properties.Threshold ? 'Pass' : 'Reject'</code></span>
+            </div>
+            <textarea
+              bind:value={inlineExpressionCode}
+              rows="4"
+              class="expression-textarea"
+              placeholder="e.g. $input.sequence.length > 50 ? 'Long' : 'Short'"
+            ></textarea>
+          </div>
+
+          <!-- Live Expression Tester -->
+          <div class="expr-tester">
+            <div class="tester-header">
+              <span>🧪 Live Expression Tester</span>
+              <button class="btn-test-expr" on:click={testNodeExpression}>▶ Run Test</button>
+            </div>
+            <div class="tester-grid">
+              <div>
+                <label class="tester-sublabel">Sample $input JSON:</label>
+                <textarea
+                  bind:value={testInputJson}
+                  rows="4"
+                  class="test-input-textarea"
+                ></textarea>
+              </div>
+              <div>
+                <label class="tester-sublabel">Evaluated Result:</label>
+                <div class="test-result-box" class:has-error={testOutputError}>
+                  {#if testOutputError}
+                    <span class="err-text">{testOutputError}</span>
+                  {:else if testOutputResult}
+                    <pre class="res-text">{testOutputResult}</pre>
+                  {:else}
+                    <span class="placeholder-text">Click "Run Test" to evaluate expression...</span>
+                  {/if}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="drawer-footer">
+        <button class="btn-cancel" on:click={closeNodeSmartConfig}>Cancel</button>
+        <button class="btn-save-drawer" on:click={saveNodeSmartConfig}>
+          💾 Save Changes to Node
+        </button>
       </div>
     </div>
   {/if}

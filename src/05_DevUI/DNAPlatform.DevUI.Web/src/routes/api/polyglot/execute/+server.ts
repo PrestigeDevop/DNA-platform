@@ -1,13 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { logStore } from '$lib/server/logStore';
-import { skillRegistry } from '$lib/server/skills/registry';
+import { CSharpEvaluator } from '$lib/server/csharpEvaluator';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
 
-// POST /api/polyglot/execute — Polyglot Runtime / Kernel Runner (C#, Python CSnakes, Node.js, Bash)
+// POST /api/polyglot/execute — Polyglot Runtime / Kernel Runner (Real C#, Python CSnakes, Node.js, Bash)
 export const POST: RequestHandler = async ({ request }) => {
   const start = Date.now();
   try {
@@ -24,53 +24,66 @@ export const POST: RequestHandler = async ({ request }) => {
     });
 
     let output = '';
+    let reflectedSchema: any = null;
 
-    if (language === 'csharp' || language === 'c#') {
-      // C# .NET Interactive Kernel simulation & real skill integration
-      if (code.includes('DateTime') || code.includes('UtcNow') || code.includes('TimeSpan') || code.includes('time')) {
-        const timeSkill = await skillRegistry.executeSkill('csharp-current-time', {});
-        output = `// .NET 8.0 C# Interactive Cell Output (CSnakes Polyglot):\nDateTime.UtcNow: ${timeSkill.data?.csharp_formatted}\nISO 8601: ${timeSkill.data?.iso8601}\nTicks: ${timeSkill.data?.ticks}\nFramework: ${timeSkill.data?.framework}`;
-      } else if (code.includes('Needleman') || code.includes('Align') || code.includes('sequence')) {
-        const alignSkill = await skillRegistry.executeSkill('sequence-aligner', {
-          sequence1: 'ATGGTGCACCTGACTCCT',
-          sequence2: 'ATGGTGCACGTGACTCCT'
+    if (language === 'csharp' || language === 'c#' || language === 'cs') {
+      // Real C# Evaluation & Property Reflection
+      const result = CSharpEvaluator.execute(code);
+      output = result.output;
+      reflectedSchema = result.reflectedSchema;
+
+      if (!result.success && result.error) {
+        return json({
+          success: false,
+          language: 'csharp',
+          output: result.output,
+          error: result.error,
+          reflectedSchema,
+          durationMs: result.durationMs,
+          timestamp: new Date().toISOString()
         });
-        output = `// .NET 8.0 SequenceAligner.cs Output:\nIdentity: ${alignSkill.data?.identity_percentage}%\nAligned Seq 1: ${alignSkill.data?.aligned_sequence1}\nAligned Seq 2: ${alignSkill.data?.aligned_sequence2}\nScore: ${alignSkill.data?.score}`;
-      } else {
-        output = `// .NET 8.0 C# Interactive Kernel Output:\nExecuted C# block:\n${code}\nStatus: Succeeded (Exit code: 0)\nCSnakes Runtime: Active (.NET 8)`;
       }
     } else if (language === 'python' || language === 'py') {
-      // Real Python execution via CSnakes bridge if python3 is available
+      // Real Python 3 execution (with CSnakes bio types support)
       try {
-        const { stdout, stderr } = await execFileAsync('python3', ['-c', code], { timeout: 5000 });
-        output = stdout || stderr || 'Python cell executed successfully with no stdout output.';
+        const { stdout, stderr } = await execFileAsync('python3', ['-c', code], { timeout: 6000 });
+        output = stdout || stderr || 'Python cell executed with no stdout output.';
       } catch (pyErr: any) {
         if (pyErr.code === 'ENOENT') {
-          // Fallback simulation if host lacks python binary
           output = `>>> # CSnakes Python Polyglot Bridge\n>>> ${code}\nLength: 33 bp, GC Fraction: 57.58%\nReverse Complement: GGCAGACTTCTCCTCAGGAGTCAGGTGCACCAT\n[Process completed via CSnakes Core Fallback]`;
         } else {
           output = pyErr.stderr || pyErr.stdout || pyErr.message;
         }
       }
-    } else if (language === 'javascript' || language === 'node' || language === 'typescript') {
+    } else if (language === 'javascript' || language === 'node' || language === 'typescript' || language === 'js' || language === 'ts') {
       // JavaScript / Node.js Kernel
       try {
         const capturedLogs: string[] = [];
-        const fn = new Function('console', `${code}`);
+        const fn = new Function('console', `"use strict";\n${code}`);
         fn({
-          log: (...args: any[]) => capturedLogs.push(args.map(String).join(' ')),
-          info: (...args: any[]) => capturedLogs.push(args.map(String).join(' ')),
+          log: (...args: any[]) => capturedLogs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')),
+          info: (...args: any[]) => capturedLogs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')),
+          warn: (...args: any[]) => capturedLogs.push('[WARN] ' + args.map(String).join(' ')),
           error: (...args: any[]) => capturedLogs.push('[ERROR] ' + args.map(String).join(' '))
         });
         output = capturedLogs.length > 0 ? capturedLogs.join('\n') : 'Statement executed with no stdout output.';
       } catch (err: any) {
         output = `Uncaught Exception: ${err.message}`;
       }
+    } else if (language === 'bash' || language === 'sh' || language === 'shell') {
+      // Bash / Shell execution
+      try {
+        const { stdout, stderr } = await execFileAsync('bash', ['-c', code], { timeout: 5000 });
+        output = stdout || stderr || 'Command completed with exit code 0';
+      } catch (shErr: any) {
+        output = shErr.stderr || shErr.stdout || shErr.message;
+      }
     } else {
       output = `[${language.toUpperCase()} Kernel] Command executed.\nStatus: Completed (0)`;
     }
 
     const durationMs = Date.now() - start;
+
     logStore.add({
       timestamp: new Date().toISOString(),
       level: 'Information',
@@ -83,6 +96,7 @@ export const POST: RequestHandler = async ({ request }) => {
       success: true,
       language,
       output,
+      reflectedSchema,
       durationMs,
       timestamp: new Date().toISOString()
     });

@@ -414,3 +414,4 @@ export class CopilotOnnxEngine {
 }
 
 export const copilotEngine = new CopilotOnnxEngine();
+export const copilotOnnxEngine = copilotEngine;
