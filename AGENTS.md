@@ -3,6 +3,8 @@
 > **Notice**: The comprehensive engineering guide, toolchain specs, extension recipes, and gap analysis have been consolidated into **[`docs/development.md`](./docs/development.md)** and **[`docs/architecture.md`](./docs/architecture.md)**.
 
 ## Core Rules for Agents
+This is a polyglot project, use minimal modular approach to align with the developer's intent, 
+Plan ,you can search solutions, Use Github for rapid development, ask if ambiguit but only if needed, and offer your solution summarized. 
 
 1. **The Single Execution Engine**:
    - `src/03_AgentWorkflowPatterns/DNAPlatform.AgentFramework` is the **single** workflow and agent engine across the repository.
