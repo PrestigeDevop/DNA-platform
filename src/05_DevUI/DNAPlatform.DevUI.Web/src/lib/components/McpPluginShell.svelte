@@ -4,6 +4,8 @@
   interface Tool {
     Name: string;
     Description: string;
+    Role?: string;
+    Enabled?: boolean;
     InputSchema?: Record<string, { propName: string; description?: string }> | null;
   }
 
@@ -12,6 +14,7 @@
     Name: string;
     Version: string;
     Status: string;
+    Enabled?: boolean;
     Category?: string;
     Message?: string;
     Tools: Tool[];
@@ -57,6 +60,54 @@
   // Test tool state
   let selectedServerId = '';
   let selectedToolName = '';
+
+  async function toggleServer(serverId: string) {
+    try {
+      const server = servers.find((s) => s.ServerId === serverId);
+      const newEnabled = server ? server.Enabled === false : false;
+      const res = await fetch('/api/mcp/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serverId, enabled: newEnabled })
+      });
+      if (res.ok) {
+        if (server) {
+          server.Enabled = newEnabled;
+          server.Status = newEnabled ? 'Running' : 'Stopped';
+          servers = [...servers];
+        }
+      }
+    } catch (e: any) {
+      console.error('Failed to toggle server:', e);
+    }
+  }
+
+  async function toggleTool(serverId: string, toolName: string) {
+    try {
+      const server = servers.find((s) => s.ServerId === serverId);
+      const tool = server?.Tools.find((t) => t.Name === toolName);
+      const newEnabled = tool ? tool.Enabled === false : false;
+      const res = await fetch('/api/mcp/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serverId, toolName, enabled: newEnabled })
+      });
+      if (res.ok) {
+        if (tool) {
+          tool.Enabled = newEnabled;
+          servers = [...servers];
+        }
+      }
+    } catch (e: any) {
+      console.error('Failed to toggle tool:', e);
+    }
+  }
+
+  function testToolDirect(serverId: string, toolName: string) {
+    selectedServerId = serverId;
+    selectedToolName = toolName;
+    activeTab = 'test';
+  }
   let toolArgsText = '{\n  "sequence": "ATGGTGCACCTGACTCCTGAGGAGAAGTCTGCC"\n}';
   let toolRunning = false;
   let toolResult: any = null;
@@ -455,7 +506,20 @@ return {
               <h3>{s.Name}</h3>
               <span class="server-id"><code>{s.ServerId}</code> · v{s.Version}</span>
             </div>
-            <span class="status-indicator live">● {s.Status}</span>
+            <div class="server-actions-right">
+              <button
+                type="button"
+                class="btn-toggle-server"
+                class:enabled={s.Enabled !== false}
+                on:click={() => toggleServer(s.ServerId)}
+                title="Toggle MCP Server & AG-UI Tools"
+              >
+                {s.Enabled !== false ? '🟢 Active' : '⚪ Disabled'}
+              </button>
+              <span class="status-indicator" class:live={s.Enabled !== false} class:offline={s.Enabled === false}>
+                ● {s.Status}
+              </span>
+            </div>
           </div>
 
           {#if s.Message}
@@ -466,9 +530,29 @@ return {
             <h4>Exposed MCP Tools:</h4>
             <div class="tools-grid">
               {#each s.Tools as t}
-                <div class="tool-badge">
-                  <strong>{t.Name}</strong>
-                  <span>{t.Description}</span>
+                <div class="tool-badge" class:disabled={t.Enabled === false}>
+                  <div class="tool-badge-top">
+                    <span class="tool-role-tag {t.Role || 'worker'}">{t.Role || 'worker'}</span>
+                    <strong>{t.Name}</strong>
+                  </div>
+                  <span class="tool-desc-text">{t.Description}</span>
+                  <div class="tool-actions-row">
+                    <button
+                      type="button"
+                      class="btn-tool-toggle"
+                      class:enabled={t.Enabled !== false}
+                      on:click={() => toggleTool(s.ServerId, t.Name)}
+                    >
+                      {t.Enabled !== false ? '✓ Enabled' : '✕ Disabled'}
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-tool-test"
+                      on:click={() => testToolDirect(s.ServerId, t.Name)}
+                    >
+                      ▶ Test
+                    </button>
+                  </div>
                 </div>
               {/each}
             </div>
@@ -553,7 +637,7 @@ return {
         💻 Polyglot Kernel & Component Studio has moved!
       </h3>
       <p style="color: #94a3b8; max-width: 600px; margin: 0 auto 1.5rem auto;">
-        The interactive multi-language kernel (real C#, Python CSnakes, JavaScript, Shell), Unity-style Smart Component authoring, and real-time Agent testing lab are now consolidated on the dedicated <strong>/kernel</strong> page.
+        The interactive multi-language kernel (real C#, Python CSnakes, JavaScript, Shell), Logic Component authoring, and real-time Agent testing lab are now consolidated on the dedicated <strong>/kernel</strong> page.
       </p>
       <a href="/kernel" class="btn primary" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.75rem; font-weight: 600; border-radius: 6px;">
         Open Kernel & Studio ↗
@@ -1234,4 +1318,89 @@ return {
     justify-content: flex-end;
     gap: 0.5rem;
   }
+
+  .server-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .btn-toggle-server {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-toggle-server.enabled {
+    background: #064e3b;
+    border-color: #059669;
+    color: #34d399;
+  }
+  .tool-badge.disabled {
+    opacity: 0.5;
+    filter: grayscale(0.8);
+  }
+  .tool-badge-top {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.25rem;
+  }
+  .tool-role-tag {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    background: #1e293b;
+    color: #38bdf8;
+  }
+  .tool-role-tag.system { color: #f43f5e; background: #88133722; }
+  .tool-role-tag.worker { color: #34d399; background: #064e3b22; }
+  .tool-role-tag.evaluator { color: #f59e0b; background: #78350f22; }
+  .tool-role-tag.assistant { color: #a855f7; background: #581c8722; }
+  .tool-desc-text {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-bottom: 0.5rem;
+    display: block;
+  }
+  .tool-actions-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.4rem;
+  }
+  .btn-tool-toggle {
+    background: #1e293b;
+    color: #94a3b8;
+    border: 1px solid #334155;
+    border-radius: 3px;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.7rem;
+    cursor: pointer;
+  }
+  .btn-tool-toggle.enabled {
+    color: #34d399;
+    border-color: #059669;
+    background: #064e3b33;
+  }
+  .btn-tool-test {
+    background: #0284c7;
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-tool-test:hover {
+    background: #0369a1;
+  }
+
 </style>

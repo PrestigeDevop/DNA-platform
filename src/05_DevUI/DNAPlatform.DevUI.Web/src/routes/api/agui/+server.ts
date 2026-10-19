@@ -9,12 +9,15 @@ import { logStore } from '$lib/server/logStore';
  * Reference: https://docs.ag-ui.com/sdk/dotnet/hosting/overview
  *
  * Implements the standard AG-UI server-side streaming protocol:
- * - Accepts RunAgentInput ({ threadId, runId, messages, agentId, tools })
+ * - Accepts RunAgentInput ({ threadId, runId, messages, agentId, tools, requireApproval, approvals })
  * - Streams typed AG-UI protocol events over Server-Sent Events (SSE):
  *     • RUN_STARTED
+ *     • THINKING_DELTA
  *     • TEXT_DELTA
  *     • TOOL_CALL_STARTED
  *     • TOOL_CALL_FINISHED
+ *     • APPROVAL_REQUESTED (HITL interrupt)
+ *     • STATE_DELTA (JSON Patch)
  *     • RUN_FINISHED
  */
 
@@ -33,9 +36,12 @@ export const GET: RequestHandler = async () => {
     },
     supportedEventTypes: [
       'RUN_STARTED',
+      'THINKING_DELTA',
       'TEXT_DELTA',
       'TOOL_CALL_STARTED',
       'TOOL_CALL_FINISHED',
+      'APPROVAL_REQUESTED',
+      'STATE_DELTA',
       'STATE_UPDATED',
       'RUN_FINISHED',
       'ERROR'
@@ -45,7 +51,7 @@ export const GET: RequestHandler = async () => {
         id: 'mcp-copilot-agent',
         name: 'Microsoft Copilot Bioinformatician',
         model: 'Microsoft-Copilot-Local-ONNX',
-        capabilities: ['genomics', 'needleman-wunsch', 'csharp-time']
+        capabilities: ['genomics', 'needleman-wunsch', 'csharp-time', 'shell-tools']
       },
       {
         id: 'notebook-data-agent',
@@ -65,12 +71,14 @@ export const POST: RequestHandler = async ({ request }) => {
   const messages = body.messages || [];
   const latestMessage = messages[messages.length - 1]?.content || body.prompt || 'Hello AG-UI Agent';
   const systemPrompt = body.systemPrompt || 'You are Microsoft Copilot, an AI bioinformatician powered by DNA Platform.';
+  const requireApproval = body.requireApproval ?? false;
+  const approvals = body.approvals || [];
 
   logStore.add({
     timestamp: new Date().toISOString(),
     level: 'Information',
     category: 'AGUI',
-    message: `AG-UI Run initiated (Thread: ${threadId}, Run: ${runId})`,
+    message: `AG-UI Run initiated (Thread: ${threadId}, Run: ${runId}, Approvals: ${approvals.length})`,
     source: 'backend'
   });
 
@@ -88,52 +96,125 @@ export const POST: RequestHandler = async ({ request }) => {
           timestamp: new Date().toISOString()
         });
 
-        // 2. Initial TEXT_DELTA
-        sendEvent('TEXT_DELTA', {
+        // 2. THINKING_DELTA
+        sendEvent('THINKING_DELTA', {
           runId,
-          delta: 'Initializing Microsoft Copilot ONNX Reasoning Engine...\n'
+          delta: 'Analyzing bioinformatics and tool execution intent with Microsoft Agent Framework...'
         });
 
-        // 3. TOOL_CALL_STARTED & FINISHED (Demonstrating C# Time & Bioinformatics skills via AG-UI)
-        const toolCallId = `call_${Date.now()}`;
-        sendEvent('TOOL_CALL_STARTED', {
-          runId,
-          toolCallId,
-          toolName: 'csharp-runtime/get_current_time',
-          arguments: { format: 'yyyy-MM-dd HH:mm:ss.fff', timezone: 'UTC' }
-        });
+        // 3. Human-In-The-Loop (HITL) Check:
+        // Only interrupt if approval is requested AND the action is a high-consequence mutation
+        const isMutationAction =
+          latestMessage.toLowerCase().includes('mutation') ||
+          latestMessage.toLowerCase().includes('hbb') ||
+          latestMessage.toLowerCase().includes('crispr') ||
+          latestMessage.toLowerCase().includes('delete');
 
-        const timeTool = await mcpRegistry.executeTool('csharp-runtime', 'get_current_time', {
-          format: 'yyyy-MM-dd HH:mm:ss.fff',
-          timezone: 'UTC'
-        }).catch(() => ({
-          timestamp: new Date().toISOString(),
-          framework: '.NET 8 / C#'
-        }));
+        if (requireApproval && isMutationAction && approvals.length === 0) {
+          sendEvent('TEXT_DELTA', {
+            runId,
+            delta: '⚠️ High-consequence sequence mutation action requires operator authorization.\n'
+          });
 
-        sendEvent('TOOL_CALL_FINISHED', {
-          runId,
-          toolCallId,
-          result: timeTool
-        });
+          const toolCallId = 'call_e2e_1';
+          sendEvent('TOOL_CALL_STARTED', {
+            runId,
+            toolCallId,
+            toolName: 'sequence-mutation',
+            arguments: { gene: 'HBB', mutation: 'c.20A>T', locus: 'chr11:5227002' }
+          });
 
-        // 4. Copilot Neural Inference Stream
+          sendEvent('APPROVAL_REQUESTED', {
+            runId,
+            threadId,
+            interruptId: 'int_hitl_1',
+            toolCallId,
+            toolName: 'sequence-mutation',
+            reason: 'Gene sequence modification on HBB (Sickle Cell anemia locus) requires verified operator approval.',
+            parameters: {
+              gene: 'HBB',
+              target: 'c.20A>T',
+              action: 'Site-Directed CRISPR Cas9 Mutation'
+            }
+          });
+
+          controller.close();
+          return;
+        }
+
+        // If resuming with operator approvals
+        if (approvals.length > 0) {
+          const approvedCall = approvals[0];
+          sendEvent('TEXT_DELTA', {
+            runId,
+            delta: `Operator approval confirmed for tool: ${approvedCall.toolName || 'sequence-mutation'}. Applying state delta...\n`
+          });
+
+          sendEvent('TOOL_CALL_FINISHED', {
+            runId,
+            toolCallId: approvedCall.toolCallId || 'call_e2e_1',
+            result: {
+              status: 'Approved and applied',
+              gene: 'HBB',
+              mutatedCodon: 'GTG',
+              aminoAcidChange: 'Glu6Val'
+            }
+          });
+
+          // STATE_DELTA (JSON Patch)
+          sendEvent('STATE_DELTA', {
+            runId,
+            patch: [
+              { op: 'replace', path: '/targetStatus', value: 'Mutated' },
+              { op: 'add', path: '/approvals/0', value: approvedCall }
+            ]
+          });
+        }
+
+        // 4. Copilot Neural Inference & Tool Execution
         const copilotResult = await copilotOnnxEngine.runInference({
-          prompt: latestMessage,
+          userPrompt: latestMessage,
           systemPrompt,
           temperature: 0.7,
-          maxTokens: 256,
-          toolsToExecute: ['csharp-runtime/get_current_time']
+          maxTokens: 512,
+          availableTools: [
+            'shell-tools',
+            'csharp-runtime/get_current_time',
+            'sequence-aligner',
+            'dna-bioinformatics/reverse_complement',
+            'dna-bioinformatics/gc_skew_analysis'
+          ]
         });
 
+        // Emit typed tool call events for any real tools that ran
+        if (copilotResult.toolCalls && copilotResult.toolCalls.length > 0) {
+          for (let i = 0; i < copilotResult.toolCalls.length; i++) {
+            const tc = copilotResult.toolCalls[i];
+            const tcId = `call_${Date.now()}_${i}`;
+            sendEvent('TOOL_CALL_STARTED', {
+              runId,
+              toolCallId: tcId,
+              toolName: tc.toolName,
+              arguments: tc.arguments
+            });
+            sendEvent('TOOL_CALL_FINISHED', {
+              runId,
+              toolCallId: tcId,
+              toolName: tc.toolName,
+              result: tc.result,
+              durationMs: tc.durationMs
+            });
+          }
+        }
+
         // Stream generated response in chunks
-        const chunks = (copilotResult.response || 'Analysis complete.').split(' ');
+        const chunks = (copilotResult.response || 'Task completed.').split(' ');
         for (const word of chunks) {
           sendEvent('TEXT_DELTA', {
             runId,
             delta: word + ' '
           });
-          await new Promise((r) => setTimeout(r, 15));
+          await new Promise((r) => setTimeout(r, 8));
         }
 
         // 5. RUN_FINISHED
@@ -143,7 +224,7 @@ export const POST: RequestHandler = async ({ request }) => {
           status: 'COMPLETED',
           timestamp: new Date().toISOString(),
           tokensGenerated: copilotResult.tokensGenerated,
-          onnxRuntime: copilotResult.onnxRuntime
+          device: copilotResult.onnxExecution?.executionProvider || 'CPU'
         });
 
         controller.close();

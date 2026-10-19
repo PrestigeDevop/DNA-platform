@@ -22,6 +22,7 @@ export interface MarketplacePlugin {
 }
 
 class MarketplaceService {
+  private customPlugins: MarketplacePlugin[] = [];
   private installedIds = new Set<string>([
     'csharp-runtime',
     'microsoft-copilot-onnx',
@@ -34,10 +35,57 @@ class MarketplaceService {
     'genomics-variant-extension'
   ]);
 
+  publishPlugin(plugin: MarketplacePlugin, toolDefinitions?: any[]): boolean {
+    const existingIdx = this.customPlugins.findIndex(p => p.id === plugin.id);
+    if (existingIdx !== -1) {
+      this.customPlugins[existingIdx] = plugin;
+    } else {
+      this.customPlugins.unshift(plugin);
+    }
+    this.installedIds.add(plugin.id);
+
+    // Register active local MCP Server if tools are defined
+    if (toolDefinitions && toolDefinitions.length > 0) {
+      mcpRegistry.register({
+        serverId: plugin.id,
+        name: plugin.name,
+        version: plugin.version || '1.0.0',
+        status: 'Running',
+        enabled: true,
+        description: plugin.description,
+        category: plugin.category,
+        tools: toolDefinitions.map(t => ({
+          name: t.name,
+          description: t.description || `Tool ${t.name}`,
+          role: t.role || 'worker',
+          enabled: true,
+          inputSchema: {
+            type: 'object',
+            properties: (t.parameters || []).reduce((acc: any, p: any) => {
+              acc[p.name] = { type: p.type || 'string', description: p.description };
+              return acc;
+            }, {})
+          }
+        })),
+        executeTool: async (toolName, args) => {
+          return {
+            status: 'Executed on local server',
+            tool: toolName,
+            args,
+            timestamp: new Date().toISOString()
+          };
+        }
+      });
+    }
+
+    return true;
+  }
+
   getPlugins(): MarketplacePlugin[] {
     const mcpServers = mcpRegistry.listServers();
 
     return [
+      ...this.customPlugins,
       {
         id: 'csharp-runtime',
         name: 'C# .NET 8 Runtime & Time Provider',
@@ -119,12 +167,12 @@ class MarketplaceService {
         name: 'Genomic StateMachine Smart Component',
         author: 'DNA Platform Community',
         version: '1.1.0',
-        description: 'Unity-inspired ECS Smart Component for state machine validation and layered sequence operations.',
+        description: 'Logic Component for state machine validation and layered sequence operations.',
         category: 'Smart Components',
         icon: '🧩',
         installed: this.installedIds.has('dna-smart-component'),
         featured: true,
-        tags: ['statemachine', 'ecs', 'smart-components', 'unity'],
+        tags: ['statemachine', 'ecs', 'smart-components', 'logic-component'],
         toolsCount: 2
       },
       {

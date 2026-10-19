@@ -1,5 +1,5 @@
 /**
- * Real C# Code Evaluator & Unity-Style Public Property Reflector
+ * Real C# Code Evaluator & Logic Component Public Property Reflector
  * 
  * Provides:
  * 1. Reflection of C# classes, methods, and public properties with [Tool] and [Description] attributes.

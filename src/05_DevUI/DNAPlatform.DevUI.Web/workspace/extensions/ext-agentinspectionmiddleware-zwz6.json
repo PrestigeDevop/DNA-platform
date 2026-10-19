@@ -1,0 +1,39 @@
+{
+  "id": "ext-agentinspectionmiddleware-zwz6",
+  "name": "AgentInspectionMiddleware",
+  "author": "Local Developer",
+  "version": "1.0.0",
+  "description": "Custom authored logic component & tool suite",
+  "category": "Agent Middleware & Guardrails",
+  "icon": "🛡️",
+  "installed": true,
+  "featured": false,
+  "tags": [
+    "csharp",
+    "middleware",
+    "validate_token"
+  ],
+  "toolsCount": 1,
+  "code": "",
+  "tools": [
+    {
+      "name": "validate_token",
+      "description": "Token guardrail",
+      "role": "evaluator"
+    }
+  ],
+  "properties": [
+    {
+      "name": "Level",
+      "type": "enum",
+      "options": [
+        "Minimal",
+        "Strict"
+      ]
+    }
+  ],
+  "mise": {
+    "miseToml": "[tools]\ndotnet = \"8.0\"\n"
+  },
+  "publishedAt": "2026-10-19T09:30:10.483Z"
+}

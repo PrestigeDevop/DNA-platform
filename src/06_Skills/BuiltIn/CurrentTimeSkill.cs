@@ -78,6 +78,30 @@ namespace DNAPlatform.Skills.BuiltIn
             }
         }
 
+        public Dictionary<string, string> GetInputSchema()
+        {
+            return new Dictionary<string, string>
+            {
+                { "format", "string - Date/time format string (e.g. 'yyyy-MM-dd HH:mm:ss.fff', 'iso8601', 'time_only')" },
+                { "prefix", "string - Custom text prefix prepended to console output (default: 'System Time: ')" },
+                { "timezone", "string - 'UTC' or 'Local' (default: 'UTC')" }
+            };
+        }
+
+        public Dictionary<string, string> GetOutputSchema()
+        {
+            return new Dictionary<string, string>
+            {
+                { "currentTime", "string - Formatted current timestamp" },
+                { "formattedPrint", "string - Ready-to-print string with prefix and timezone" },
+                { "utcIso", "string - ISO-8601 UTC timestamp" },
+                { "unixTimestampMs", "number - Epoch timestamp in milliseconds" },
+                { "timezone", "string - Resolved timezone name" },
+                { "timeOfDay", "string - Morning, Afternoon, or Evening" },
+                { "language", "string - Execution runtime identifier" }
+            };
+        }
+
         public SkillMetadata GetMetadata()
         {
             return new SkillMetadata
@@ -87,6 +111,9 @@ namespace DNAPlatform.Skills.BuiltIn
                 Description = Description,
                 Category = Category,
                 Icon = Icon,
+                InputSchema = GetInputSchema(),
+                OutputSchema = GetOutputSchema(),
+                Version = "1.0.0",
                 InputFields = new List<InputFieldMetadata>
                 {
                     new InputFieldMetadata

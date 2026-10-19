@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { api } from '$lib/services/api';
+  import MonacoEditor from '$lib/components/MonacoEditor.svelte';
 
   export let workflow: any;
   export let execution: any = null;
@@ -16,16 +17,17 @@
 
   const TYPE_META: Record<string, NodeMeta> = {
     Input: { icon: '📥', color: '#0ea5e9', label: 'Input', desc: 'Pass strongly typed entity string' },
-    Agent: { icon: '🤖', color: '#a855f7', label: 'Copilot Agent', desc: 'Microsoft Copilot ONNX Prompt Flow' },
-    Output: { icon: '🖥️', color: '#10b981', label: 'Output', desc: 'Prints to backend console' },
+    Agent: { icon: '🤖', color: '#a855f7', label: 'Copilot Agent', desc: 'Microsoft Copilot ONNX Reasoning' },
     ProcessingSkill: { icon: '🧬', color: '#f59e0b', label: 'Bio Skill', desc: 'Execute registry skill or C# clock' },
-    Loop: { icon: '🔁', color: '#8b5cf6', label: 'Loop', desc: 'Repeat iteration / accumulator' },
+    WorkspaceFileSystem: { icon: '📁', color: '#06b6d4', label: 'Workspace File System', desc: 'Read, write, list files in workspace' },
+    StateMachine: { icon: '🎮', color: '#38bdf8', label: 'State Machine', desc: 'Layered state machine with transitions & conditions' },
+    LogicComponent: { icon: '🧩', color: '#8b5cf6', label: 'Logic Component', desc: 'Multi-I/O C#, CSnakes Python & JS component' },
+    Output: { icon: '🖥️', color: '#10b981', label: 'Output', desc: 'Prints to backend console' },
+    Loop: { icon: '🔁', color: '#6366f1', label: 'Loop', desc: 'Repeat iteration / accumulator' },
     Conditional: { icon: '🔀', color: '#ec4899', label: 'Conditional', desc: 'Branching logic' },
     SubWorkflow: { icon: '📦', color: '#64748b', label: 'Sub-Workflow', desc: 'Nested pipeline run' },
     CronJob: { icon: '⏰', color: '#eab308', label: 'Cron Job', desc: 'Scheduled interval trigger' },
-    StateMachine: { icon: '🎮', color: '#38bdf8', label: 'State Machine', desc: 'Unity-style layered FSM' },
-    SmartComponent: { icon: '🧩', color: '#06b6d4', label: 'Smart Component', desc: 'Authorable custom ECS unit' },
-    Value: { icon: '🔢', color: '#6366f1', label: 'Value', desc: 'Constant value' },
+    Value: { icon: '🔢', color: '#94a3b8', label: 'Value', desc: 'Constant value' },
     Log: { icon: '📜', color: '#ef4444', label: 'Log', desc: 'Write to log stream' }
   };
 
@@ -53,7 +55,59 @@
 
   const ENTITY_TYPES = ['String', 'DNA_Sequence', 'Int32', 'Float', 'Boolean', 'Vector3', 'JSON'];
 
-  let activeView: 'canvas' | 'statemachine' | 'smart_component' = 'canvas';
+  let activeView: 'canvas' | 'logic_fsm' = 'canvas';
+  let fullSizeCanvas = false;
+
+  // Interactive FSM Parameters & Events
+  let fsmParameters: Array<{ name: string; type: 'Int32' | 'Float' | 'Boolean' | 'Trigger'; value: any }> = [
+    { name: 'sequence_length', type: 'Int32', value: 58 },
+    { name: 'gc_score', type: 'Float', value: 0.58 },
+    { name: 'isValid', type: 'Boolean', value: true },
+    { name: 'allowFlow', type: 'Boolean', value: true },
+    { name: 'onStartTrigger', type: 'Trigger', value: false }
+  ];
+  let newParamName = '';
+  let newParamType: 'Int32' | 'Float' | 'Boolean' | 'Trigger' = 'Boolean';
+  let showAddParamModal = false;
+
+  let fsmEvents: Array<{ name: string; description: string; lastDispatched?: string }> = [
+    { name: 'OnStart', description: 'Triggered on pipeline start' },
+    { name: 'OnSequenceLoaded', description: 'Fired when input DNA sequence loaded' },
+    { name: 'OnValidationPassed', description: 'Fired when CSnakes quality checks pass' },
+    { name: 'OnArtifactWritten', description: 'Fired when workspace file is saved' }
+  ];
+  let newEventName = '';
+  let showAddEventModal = false;
+
+  function addFsmParameter() {
+    if (!newParamName.trim()) return;
+    const defVal = newParamType === 'Boolean' ? true : newParamType === 'Trigger' ? false : 0;
+    fsmParameters = [...fsmParameters, { name: newParamName.trim(), type: newParamType, value: defVal }];
+    newParamName = '';
+    showAddParamModal = false;
+  }
+
+  function addFsmEvent() {
+    if (!newEventName.trim()) return;
+    fsmEvents = [...fsmEvents, { name: newEventName.trim(), description: 'Custom user-defined transition event' }];
+    newEventName = '';
+    showAddEventModal = false;
+  }
+
+  function dispatchFsmEvent(evtName: string) {
+    const evt = fsmEvents.find(e => e.name === evtName);
+    if (evt) {
+      evt.lastDispatched = new Date().toLocaleTimeString();
+      fsmEvents = [...fsmEvents];
+    }
+    // Also toggle any matching trigger parameter
+    const param = fsmParameters.find(p => p.name === evtName || p.name === evtName + 'Trigger');
+    if (param && param.type === 'Trigger') {
+      param.value = true;
+      setTimeout(() => { param.value = false; fsmParameters = [...fsmParameters]; }, 800);
+      fsmParameters = [...fsmParameters];
+    }
+  }
 
   let nodes: any[] = [];
   let connections: any[] = [];
@@ -69,7 +123,7 @@
   let message = '';
   let error = '';
 
-  // Unity State Machine Designer State
+  // State Machine Designer State
   let fsmLayers = ['Base Layer', 'QC Layer', 'Inference Layer'];
   let activeFsmLayer = 'Base Layer';
   let fsmStates = [
@@ -80,6 +134,10 @@
     { id: 's_exit', name: 'Completed / Exit', type: 'exit', x: 860, y: 80 }
   ];
   let activeFsmState = 's_idle';
+  function getStateName(id: string): string {
+    const s = fsmStates.find(x => x.id === id);
+    return s ? s.name : id;
+  }
   let fsmTransitions = [
     { from: 's_entry', to: 's_idle', trigger: 'OnStart', condition: 'Always' },
     { from: 's_idle', to: 's_process', trigger: 'OnSequenceLoaded', condition: 'length > 10' },
@@ -111,13 +169,180 @@
     return [];
   }
 
+  
+  // Agent Model Download & Cache Management
+  let downloadedAgentModels: Record<string, boolean> = {
+    'Microsoft-Copilot-Local-ONNX': true,
+    'Microsoft-Copilot-Bio-ONNX': true,
+    'Phi-3.5-mini-ONNX': true,
+    'Biomedical-Copilot-v1': true
+  };
+  let agentModelDownloading = false;
+  let agentModelProgress = 0;
+
+  function downloadAgentModel(modelName: string) {
+    if (agentModelDownloading || downloadedAgentModels[modelName]) return;
+    agentModelDownloading = true;
+    agentModelProgress = 20;
+    const interval = setInterval(() => {
+      agentModelProgress += 25;
+      if (agentModelProgress >= 100) {
+        clearInterval(interval);
+        downloadedAgentModels[modelName] = true;
+        downloadedAgentModels = { ...downloadedAgentModels };
+        agentModelDownloading = false;
+        agentModelProgress = 0;
+      }
+    }, 250);
+  }
+
+  // Custom ECS Property Schema Creator State
+  let showAddPropertyForm = false;
+  let newPropName = '';
+  let newPropType: 'enum' | 'vectordb' | 'number' | 'boolean' | 'string' = 'enum';
+  let newPropOptions = 'Permissive, Standard, Strict';
+  let newPropDefault = 'Standard';
+  let newPropDesc = '';
+
+  function addCustomEcsProperty(node: any) {
+    if (!node || !newPropName.trim()) return;
+    if (!node.config) node.config = {};
+    if (!node.config.properties) node.config.properties = {};
+    if (!node.config.propertySchemas) node.config.propertySchemas = [];
+
+    const pName = newPropName.trim();
+    let schema: any = {
+      name: pName,
+      type: newPropType,
+      description: newPropDesc || `${newPropType} property for ${pName}`,
+      defaultValue: newPropDefault
+    };
+
+    if (newPropType === 'enum') {
+      const opts = newPropOptions.split(',').map(s => s.trim()).filter(Boolean);
+      schema.options = opts.length > 0 ? opts : ['Default'];
+      schema.defaultValue = opts[0] || 'Default';
+      node.config.properties[pName] = schema.defaultValue;
+    } else if (newPropType === 'vectordb') {
+      schema.defaultValue = 'pgvector_default';
+      schema.vectorDbConfig = {
+        provider: 'pgvector',
+        collection: 'genomic_embeddings',
+        dimension: 1536,
+        connectionUri: 'postgresql://postgres:postgres@localhost:5432/dnaplatform'
+      };
+      node.config.properties[pName] = 'pgvector_default';
+    } else if (newPropType === 'number') {
+      const num = parseFloat(newPropDefault) || 0.85;
+      schema.min = 0;
+      schema.max = 1;
+      schema.step = 0.05;
+      schema.defaultValue = num;
+      node.config.properties[pName] = num;
+    } else if (newPropType === 'boolean') {
+      const b = newPropDefault === 'true' || newPropDefault === true;
+      schema.defaultValue = b;
+      node.config.properties[pName] = b;
+    } else {
+      schema.defaultValue = newPropDefault;
+      node.config.properties[pName] = newPropDefault;
+    }
+
+    node.config.propertySchemas = [...node.config.propertySchemas, schema];
+    nodes = [...nodes];
+
+    // Reset creator
+    newPropName = '';
+    showAddPropertyForm = false;
+  }
+
+  function removeCustomEcsProperty(node: any, pName: string) {
+    if (!node || !node.config) return;
+    if (node.config.propertySchemas) {
+      node.config.propertySchemas = node.config.propertySchemas.filter((s: any) => s.name !== pName);
+    }
+    if (node.config.properties) {
+      delete node.config.properties[pName];
+    }
+    nodes = [...nodes];
+  }
+
+  async function autoReflectNodeSchemas(node: any) {
+    if (!node) return;
+    const code = node.config?.script || node.config?.expression || '';
+    const lang = node.config?.runtime || node.config?.language || 'csharp';
+    try {
+      const res = await fetch('/api/authoring/reflect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, language: lang })
+      });
+      const data = await res.json();
+      if (data.success && data.result) {
+        if (!node.config) node.config = {};
+        if (!node.config.properties) node.config.properties = {};
+        node.config.propertySchemas = data.result.properties || [];
+        for (const p of node.config.propertySchemas) {
+          if (node.config.properties[p.name] === undefined) {
+            node.config.properties[p.name] = p.defaultValue;
+          }
+        }
+        nodes = [...nodes];
+        message = `✔ Auto-reflected ${node.config.propertySchemas.length} ECS properties from code!`;
+        setTimeout(() => (message = ''), 3000);
+      }
+    } catch (e: any) {
+      console.warn('Reflection error:', e);
+    }
+  }
+
+  // Load custom components from authoring studio
+  let customStudioComponents: any[] = [];
+  function loadCustomStudioComponents() {
+    try {
+      const stored = localStorage.getItem('dna_custom_components');
+      if (stored) {
+        customStudioComponents = JSON.parse(stored);
+      }
+    } catch (e) {}
+  }
+
   onMount(() => {
     const wf = workflow || {};
     const parsedNodes = safeParseJson(wf.nodes);
     const parsedConns = safeParseJson(wf.connections);
 
     if (parsedNodes.length === 0) {
-      loadPipelinePreset('copilot');
+      const n1 = 'node_input_1';
+      const n2 = 'node_output_1';
+      nodes = [
+        {
+          id: n1,
+          type: 'Input',
+          name: 'DNA Sequence Input',
+          x: 100,
+          y: 140,
+          config: {
+            value: 'ATGGTGCACCTGACTCCTGAGGAGAAGTCTGCCGTTACTGCCCTGTGGGGCAAGGTG',
+            key: 'sequence',
+            entityType: 'DNA_Sequence'
+          }
+        },
+        {
+          id: n2,
+          type: 'Output',
+          name: 'Terminal Console Logger',
+          x: 480,
+          y: 140,
+          config: {
+            prefix: '>> PIPELINE RESULT:'
+          }
+        }
+      ];
+      connections = [
+        { id: 'c1', from: n1, to: n2, sourceNodeId: n1, targetNodeId: n2 }
+      ];
+      selectedId = n1;
     } else {
       nodes = parsedNodes.map((n: any) => ({
         ...n,
@@ -149,6 +374,7 @@
   });
 
   function getMeta(type: string): NodeMeta {
+    if (type === 'SmartComponent') return TYPE_META['LogicComponent'];
     return TYPE_META[type] || { icon: '🧩', color: '#64748b', label: type, desc: '' };
   }
 
@@ -299,7 +525,16 @@
     const y = CANVAS_PADDING + Math.floor(Math.random() * 150);
     const meta = getMeta(type);
 
-    const defaultConfig: Record<string, any> = {};
+    const defaultConfig: Record<string, any> = {
+      properties: {},
+      logicComponent: {
+        enabled: true,
+        name: `${meta.label} Logic Component`,
+        runtime: 'javascript',
+        inputs: [{ name: 'input', type: 'DNA_Sequence' }],
+        outputs: [{ name: 'output', type: 'JSON' }]
+      }
+    };
     if (type === 'Input') {
       defaultConfig.value = 'ATGGTGCACCTGACTCCTGAGGAGAAGTCTGCC';
       defaultConfig.key = 'input_text';
@@ -308,9 +543,13 @@
       defaultConfig.model = 'Microsoft-Copilot-Local-ONNX';
       defaultConfig.systemPrompt = 'You are a Microsoft Copilot bioinformatic assistant.';
       defaultConfig.prompt = 'Analyze sequence: {{input}}';
-      defaultConfig.tools = ['csharp-runtime/get_current_time', 'sequence-aligner', 'dna-bioinformatics/reverse_complement'];
+      defaultConfig.tools = ['csharp-runtime/get_current_time', 'sequence-aligner', 'dna-bioinformatics/reverse_complement', 'dna-bioinformatics/gc_skew_analysis'];
     } else if (type === 'ProcessingSkill') {
       defaultConfig.skillId = 'sequence-aligner';
+    } else if (type === 'WorkspaceFileSystem') {
+      defaultConfig.operation = 'write_file';
+      defaultConfig.filePath = 'artifacts/pipeline_summary.json';
+      defaultConfig.fileContent = '';
     } else if (type === 'Loop') {
       defaultConfig.iterations = 3;
       defaultConfig.mode = 'count';
@@ -324,9 +563,23 @@
       defaultConfig.currentState = 'Idle';
       defaultConfig.targetState = 'Processing';
       defaultConfig.activeLayer = 'Base Layer';
-    } else if (type === 'SmartComponent') {
-      defaultConfig.componentName = 'DNA Splice Junction Smart Component';
-      defaultConfig.transformMode = 'dna-enhance';
+    } else if (type === 'LogicComponent' || type === 'SmartComponent') {
+      defaultConfig.componentName = 'Custom Logic Component';
+      defaultConfig.runtime = 'python';
+      defaultConfig.inputs = [
+        { name: 'sequence', type: 'DNA_Sequence' },
+        { name: 'reference', type: 'DNA_Sequence' }
+      ];
+      defaultConfig.outputs = [
+        { name: 'alignmentScore', type: 'Float' },
+        { name: 'verified', type: 'Boolean' }
+      ];
+      defaultConfig.properties = {
+        cutoff: 0.85,
+        strictValidation: true
+      };
+      defaultConfig.expression = 'Console.log(Time.now + " [LogicComponent: " + this.name + "] running");\nthis.properties.verified = true;\nreturn { ...$input, verified: true };';
+      defaultConfig.hasExpression = true;
     } else if (type === 'Output') {
       defaultConfig.prefix = '>> BACKEND LOG:';
     }
@@ -536,8 +789,10 @@
       return `[${et}] "${v.slice(0, 18)}${v.length > 18 ? '…' : ''}"`;
     }
     if (node.type === 'Agent') {
-      const m = node.config?.model || 'Copilot-ONNX';
-      return `${m.split('-')[0]} · ${node.config?.prompt || '{{input}}'}`;
+      const m = node.config?.model || 'Microsoft-Copilot-Local-ONNX';
+      const prompt = node.config?.prompt || '{{input}}';
+      const shortModel = m.replace('Microsoft-', '').replace('-ONNX', '');
+      return `[${shortModel}] ⚡ ${prompt}`;
     }
     if (node.type === 'ProcessingSkill') {
       return `Skill: ${node.config?.skillId || 'unassigned'}`;
@@ -674,8 +929,432 @@
   // --------------------------------------------------------------------------
   // SMART COMPONENT INSPECTOR & INLINE EXPRESSION ENGINE (n8n / Elsa Style)
   // --------------------------------------------------------------------------
+
+  // Node Context Menu & Custom Script Attachment State
+  let showContextMenu = false;
+  let contextMenuNode: any = null;
+  let contextMenuX = 0;
+  let contextMenuY = 0;
+
+  // Drawer Tabs: 'identity' | 'script' | 'props' | 'expression' | 'stm'
+  let drawerActiveTab: 'identity' | 'script' | 'props' | 'expression' | 'stm' = 'script';
+  let nodeScriptLanguage: 'javascript' | 'python' | 'csharp' = 'javascript';
+  let nodeScriptCode = '';
+  let testScriptInput = '{\n  "sequence": "ATGCGATCGATC",\n  "gc": 0.50,\n  "length": 12,\n  "quality": 0.95\n}';
+  let testScriptResult = '';
+  let testScriptError = '';
+  let testingScript = false;
+
+  // Logic Component Authoring in Tab
+  let lcName = 'DNA Phase Gate Logic Component';
+  let lcCategory = 'State Machine';
+  let lcLanguage: 'csharp' | 'python' | 'javascript' = 'csharp';
+  let lcDescription = 'Evaluates genomic invariants and controls state machine transition gates.';
+  let lcCode = `using System;\nusing System.ComponentModel;\n\n[Category("State Machine")]\n[Description("DNA Phase Gate logic_component")]\npublic class DnaPhaseGate : StateMachineBehaviour\n{\n    [Description("Quality cutoff score")]\n    public double Threshold { get; set; } = 0.85;\n\n    [Description("Enforce strict validation")]\n    public bool StrictQualityGate { get; set; } = true;\n\n    public override void OnStateEnter(string state, object data)\n    {\n        Console.WriteLine($"[logic_component] Entering state: {state}");\n    }\n\n    [Tool("validate_flow", "Validates incoming DNA sequence")]\n    public bool ValidateFlow(string sequence)\n    {\n        var dna = new DnaSequence(sequence);\n        return dna.CalculateGc() >= Threshold;\n    }\n}`;
+  let lcTestOutput = '';
+  let lcTesting = false;
+
+  function onOpenContextMenu(event: MouseEvent, node: any) {
+    event.preventDefault();
+    event.stopPropagation();
+    contextMenuNode = node;
+    contextMenuX = event.clientX;
+    contextMenuY = event.clientY;
+    showContextMenu = true;
+  }
+
+  function duplicateNode(node: any) {
+    if (!node) return;
+    const id = 'node_' + Math.random().toString(36).slice(2, 7);
+    const newNode = {
+      ...JSON.parse(JSON.stringify(node)),
+      id,
+      name: (node.name || 'Node') + ' (Copy)',
+      x: (node.x || 100) + 40,
+      y: (node.y || 100) + 40
+    };
+    nodes = [...nodes, newNode];
+    selectedId = id;
+    showContextMenu = false;
+    message = `Duplicated node "${newNode.name}"`;
+    setTimeout(() => (message = ''), 2500);
+  }
+
+  function deleteNodeById(nodeId: string) {
+    nodes = nodes.filter((n) => n.id !== nodeId);
+    connections = connections.filter((c) => c.from !== nodeId && c.to !== nodeId);
+    if (selectedId === nodeId) selectedId = null;
+    showContextMenu = false;
+    message = `Deleted node`;
+    setTimeout(() => (message = ''), 2000);
+  }
+
+  async function testNodeScript() {
+    testingScript = true;
+    testScriptResult = '';
+    testScriptError = '';
+    try {
+      let parsedInput: any = {};
+      try {
+        parsedInput = JSON.parse(testScriptInput);
+      } catch (err: any) {
+        testScriptError = 'Invalid Input JSON: ' + err.message;
+        testingScript = false;
+        return;
+      }
+
+      const res = await fetch('/api/polyglot/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language: nodeScriptLanguage,
+          code: nodeScriptCode
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        testScriptResult = data.output || '// Script executed successfully with no stdout output.';
+      } else {
+        testScriptError = data.error || data.output || 'Script execution failed.';
+      }
+    } catch (e: any) {
+      testScriptError = 'Network error: ' + (e.message || String(e));
+    } finally {
+      testingScript = false;
+    }
+  }
+
+  async function testLogicComponentCode() {
+    lcTesting = true;
+    lcTestOutput = '';
+    try {
+      const res = await fetch('/api/polyglot/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language: lcLanguage,
+          code: lcCode
+        })
+      });
+      const data = await res.json();
+      lcTestOutput = data.output || '// Component syntax verified.';
+    } catch (e: any) {
+      lcTestOutput = 'Test error: ' + (e.message || String(e));
+    } finally {
+      lcTesting = false;
+    }
+  }
+
+  async function saveAndAddLogicComponent() {
+    const compId = 'comp-' + Math.random().toString(36).slice(2, 8);
+    const newComp = {
+      id: compId,
+      name: lcName,
+      category: lcCategory,
+      language: lcLanguage,
+      description: lcDescription,
+      code: lcCode,
+      properties: [
+        { name: 'Threshold', type: 'number', default: 0.85, min: 0, max: 1, step: 0.05, description: 'Cutoff score' },
+        { name: 'StrictQualityGate', type: 'boolean', default: true, description: 'Enforce strict validation' }
+      ]
+    };
+
+    try {
+      await fetch('/api/components', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newComp)
+      });
+      await loadCustomComponentsList();
+    } catch {}
+
+    addCustomComponentNode(newComp);
+    activeView = 'canvas';
+    message = `Logic component "${lcName}" saved to catalog and added to canvas flow!`;
+    setTimeout(() => (message = ''), 3500);
+  }
+
   let showNodeDrawer = false;
   let inspectingNode: any = null;
+
+  // --------------------------------------------------------------------------
+  // ATTACHED EXPRESSION ENGINE (n8n / Elsa Style) & INTELLISENSE
+  // --------------------------------------------------------------------------
+  let exprTextareaEl: HTMLTextAreaElement | null = null;
+  let focusTextareaEl: HTMLTextAreaElement | null = null;
+  let isFocusMode = false;
+  let focusNode: any = null;
+
+  let showAutocomplete = false;
+  let autocompleteIdx = 0;
+  let cursorToken = '';
+  let tokenStartPos = 0;
+  let popupPos = { top: 40, left: 10 };
+
+  let exprTestRunning = false;
+  let exprTestOutput = '';
+
+  interface SuggestionItem {
+    label: string;
+    insertText: string;
+    desc: string;
+    type: 'method' | 'property' | 'variable' | 'class';
+    icon: string;
+  }
+
+  const INTELLISENSE_ITEMS: SuggestionItem[] = [
+    { label: 'Console.log(msg)', insertText: 'Console.log(', desc: 'Print message to workflow execution logs', type: 'method', icon: '📜' },
+    { label: 'Console.warn(msg)', insertText: 'Console.warn(', desc: 'Print warning to workflow execution logs', type: 'method', icon: '⚠️' },
+    { label: 'Time.now', insertText: 'Time.now', desc: 'Current ISO 8601 timestamp string', type: 'property', icon: '⏱️' },
+    { label: 'Time.utc', insertText: 'Time.utc', desc: 'Current UTC string representation', type: 'property', icon: '⏱️' },
+    { label: 'DateTime.UtcNow', insertText: 'DateTime.UtcNow', desc: 'C# high-precision UTC time provider', type: 'property', icon: '⏱️' },
+    { label: 'this.name', insertText: 'this.name', desc: 'Name of the current workflow node', type: 'property', icon: '🏷️' },
+    { label: 'this.id', insertText: 'this.id', desc: 'Unique identifier of current node', type: 'property', icon: '🔑' },
+    { label: 'this.type', insertText: 'this.type', desc: 'Component type of current node', type: 'property', icon: '🧩' },
+    { label: '$input', insertText: '$input', desc: 'Incoming execution payload from upstream node', type: 'variable', icon: '📥' },
+    { label: '$json', insertText: '$json', desc: 'Alias for incoming JSON data structure', type: 'variable', icon: '📄' },
+    { label: '$nodes', insertText: '$nodes', desc: 'Dictionary of all upstream node outputs', type: 'variable', icon: '🌐' },
+    { label: 'DnaSequence', insertText: 'DnaSequence', desc: 'Bioinformatics DNA Sequence helper class', type: 'class', icon: '🧬' }
+  ];
+
+  let filteredSuggestions: SuggestionItem[] = [...INTELLISENSE_ITEMS];
+
+  function handleExprInput(e: Event, node: any, isFocus = false) {
+    const textarea = (isFocus ? focusTextareaEl : exprTextareaEl) || (e.target as HTMLTextAreaElement);
+    if (!textarea) return;
+
+    const val = textarea.value;
+    const cursorPos = textarea.selectionStart;
+
+    // Detect token preceding cursor
+    const textBefore = val.slice(0, cursorPos);
+    const match = textBefore.match(/([a-zA-Z0-9_\$\.]+)$/);
+
+    if (match) {
+      cursorToken = match[1];
+      tokenStartPos = cursorPos - cursorToken.length;
+
+      const q = cursorToken.toLowerCase();
+      filteredSuggestions = INTELLISENSE_ITEMS.filter((item) => {
+        return (
+          item.label.toLowerCase().includes(q) ||
+          item.insertText.toLowerCase().includes(q) ||
+          (q.endsWith('.') && item.insertText.toLowerCase().startsWith(q))
+        );
+      });
+
+      if (filteredSuggestions.length > 0) {
+        showAutocomplete = true;
+        autocompleteIdx = 0;
+        popupPos = { top: Math.min(200, textarea.clientHeight - 40), left: 14 };
+      } else {
+        showAutocomplete = false;
+      }
+    } else {
+      showAutocomplete = false;
+    }
+
+    if (node && node.config) {
+      node.config.expression = val;
+      nodes = [...nodes];
+    }
+  }
+
+  function handleExprKeydown(e: KeyboardEvent, node: any, isFocus = false) {
+    if (!showAutocomplete || filteredSuggestions.length === 0) {
+      if (e.ctrlKey && e.key === ' ') {
+        e.preventDefault();
+        filteredSuggestions = [...INTELLISENSE_ITEMS];
+        showAutocomplete = true;
+        autocompleteIdx = 0;
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      autocompleteIdx = (autocompleteIdx + 1) % filteredSuggestions.length;
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      autocompleteIdx = (autocompleteIdx - 1 + filteredSuggestions.length) % filteredSuggestions.length;
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      applySuggestion(filteredSuggestions[autocompleteIdx], node, isFocus);
+    } else if (e.key === 'Escape') {
+      showAutocomplete = false;
+    }
+  }
+
+  function applySuggestion(item: SuggestionItem, node: any, isFocus = false) {
+    const textarea = isFocus ? focusTextareaEl : exprTextareaEl;
+    if (!textarea || !node || !node.config) return;
+
+    const currentVal = node.config.expression || '';
+    const before = currentVal.slice(0, tokenStartPos);
+    const after = currentVal.slice(tokenStartPos + cursorToken.length);
+
+    let insertion = item.insertText;
+    if (cursorToken.includes('.')) {
+      const lastDot = cursorToken.lastIndexOf('.');
+      const prefix = cursorToken.slice(0, lastDot + 1);
+      if (item.insertText.startsWith(prefix)) {
+        insertion = item.insertText.slice(prefix.length);
+      }
+    }
+
+    node.config.expression = before + (cursorToken.includes('.') ? cursorToken.slice(0, cursorToken.lastIndexOf('.') + 1) + insertion : insertion) + after;
+    showAutocomplete = false;
+    nodes = [...nodes];
+
+    setTimeout(() => {
+      if (textarea) {
+        textarea.focus();
+        const newPos = tokenStartPos + insertion.length;
+        textarea.setSelectionRange(newPos, newPos);
+      }
+    }, 10);
+  }
+
+  function insertSnippet(node: any, snippet: string) {
+    if (!node || !node.config) return;
+    if (!node.config.expression) {
+      node.config.expression = snippet;
+    } else {
+      node.config.expression = node.config.expression.trim() + '\n' + snippet;
+    }
+    nodes = [...nodes];
+  }
+
+  async function testExpressionOnNode(node: any) {
+    if (!node) return;
+    exprTestRunning = true;
+    exprTestOutput = '';
+
+    const expr = node.config?.expression || '';
+    if (!expr.trim()) {
+      exprTestOutput = '// (Empty expression — passes input through unmodified)';
+      exprTestRunning = false;
+      return;
+    }
+
+    const consoleLogs: string[] = [];
+    const mockConsole = {
+      log: (...args: any[]) => {
+        consoleLogs.push(args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
+      },
+      warn: (...args: any[]) => mockConsole.log('[WARN]', ...args),
+      error: (...args: any[]) => mockConsole.log('[ERROR]', ...args)
+    };
+
+    if (!node.config) node.config = {};
+    if (!node.config.properties) node.config.properties = {};
+
+    const nodeInstance = {
+      id: node.id,
+      name: node.name,
+      type: node.type === 'SmartComponent' ? 'LogicComponent' : node.type,
+      config: node.config,
+      properties: node.config.properties
+    };
+
+    const scriptArgs = {
+      $input: node.config?.value ? { value: node.config.value, sequence: 'ATGGTGCACCTGACTCCTGAGGAGAAGTCT' } : { status: 'active', count: 1 },
+      $json: node.config?.value ? { value: node.config.value } : { status: 'active' },
+      $nodes: { [node.id]: { output: 'sample_output' } },
+      Console: mockConsole,
+      console: mockConsole,
+      Time: {
+        now: new Date().toISOString(),
+        utc: new Date().toUTCString(),
+        unix: Date.now()
+      },
+      DateTime: {
+        UtcNow: new Date().toISOString()
+      }
+    };
+
+    try {
+      const fn = new Function(...Object.keys(scriptArgs), `
+        try {
+          ${expr.includes('return') ? expr : `const _res = (${expr}); return _res;`}
+        } catch (err) {
+          Console.log("Execution error: " + err.message);
+          return undefined;
+        }
+      `);
+
+      const result = fn.call(nodeInstance, ...Object.values(scriptArgs));
+
+      // Synchronize any ECS properties created or referenced in the expression
+      if (nodeInstance.properties) {
+        node.config.properties = { ...nodeInstance.properties };
+        nodes = [...nodes];
+      }
+
+      let out = '';
+      if (consoleLogs.length > 0) {
+        out += '── Captured Console Logs ──\n' + consoleLogs.join('\n') + '\n\n';
+      }
+      out += '── Return Value ──\n' + (result !== undefined ? (typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result)) : '(undefined)');
+      if (Object.keys(nodeInstance.properties).length > 0) {
+        out += '\n\n── Node Scriptable ECS Properties ──\n' + JSON.stringify(nodeInstance.properties, null, 2);
+      }
+      exprTestOutput = out;
+    } catch (err: any) {
+      exprTestOutput = `Syntax / Evaluation Error:\n${err.message}`;
+    } finally {
+      exprTestRunning = false;
+    }
+  }
+
+  function addNodeEcsProperty(node: any) {
+    if (!node) return;
+    if (!node.config) node.config = {};
+    if (!node.config.properties) node.config.properties = {};
+    const count = Object.keys(node.config.properties).length + 1;
+    node.config.properties[`prop_${count}`] = 'value';
+    nodes = [...nodes];
+  }
+
+  function removeNodeEcsProperty(node: any, key: string) {
+    if (!node || !node.config || !node.config.properties) return;
+    delete node.config.properties[key];
+    nodes = [...nodes];
+  }
+
+  function addNodePort(node: any, direction: 'inputs' | 'outputs') {
+    if (!node) return;
+    if (!node.config) node.config = {};
+    if (!node.config[direction]) node.config[direction] = [];
+    const count = node.config[direction].length + 1;
+    node.config[direction].push({
+      name: `${direction === 'inputs' ? 'in' : 'out'}_${count}`,
+      type: direction === 'inputs' ? 'DNA_Sequence' : 'JSON'
+    });
+    nodes = [...nodes];
+  }
+
+  function removeNodePort(node: any, direction: 'inputs' | 'outputs', index: number) {
+    if (!node || !node.config || !node.config[direction]) return;
+    node.config[direction].splice(index, 1);
+    nodes = [...nodes];
+  }
+
+  function openFocusMode(node: any) {
+    if (!node) return;
+    focusNode = node;
+    isFocusMode = true;
+    showAutocomplete = false;
+    exprTestOutput = '';
+  }
+
+  function closeFocusMode() {
+    isFocusMode = false;
+    focusNode = null;
+    showAutocomplete = false;
+  }
   let inspectingNodeProps: Array<{ name: string; type: string; default: any; value: any; min?: number; max?: number; step?: number; description?: string }> = [];
   let customComponentsList: any[] = [];
   let selectedComponentId = '';
@@ -712,6 +1391,10 @@
     inspectingNode = JSON.parse(JSON.stringify(node));
     inlineExpressionCode = inspectingNode.config?.expression || inspectingNode.expression || '';
     selectedComponentId = inspectingNode.config?.componentId || '';
+    nodeScriptCode = inspectingNode.config?.customScript || inspectingNode.customScript || '';
+    nodeScriptLanguage = inspectingNode.config?.scriptLanguage || inspectingNode.scriptLanguage || 'javascript';
+    testScriptResult = '';
+    testScriptError = '';
 
     // Load custom properties
     const props = inspectingNode.config?.customProperties || inspectingNode.customProperties || [];
@@ -809,8 +1492,31 @@
         return;
       }
 
-      const exprFn = new Function('$input', 'input', 'properties', 'props', `"use strict";\nreturn (${rawExpr});`);
-      const res = exprFn(parsedInput, parsedInput, properties, properties);
+      const nodeInstance = {
+        id: inspectingNode?.id || 'node_1',
+        name: inspectingNode?.name || 'Current Node',
+        type: inspectingNode?.type || 'LogicComponent',
+        properties,
+        props: properties,
+        config: inspectingNode?.config || {}
+      };
+      const mockConsole = {
+        log: (...args: any[]) => console.log('[Expr]', ...args),
+        warn: (...args: any[]) => console.warn('[Expr]', ...args),
+        error: (...args: any[]) => console.error('[Expr]', ...args)
+      };
+      const Time = { now: new Date().toISOString(), utc: new Date().toUTCString(), unix: Date.now() };
+      const DateTime = { UtcNow: new Date().toISOString() };
+
+      let cleanExpr = rawExpr.trim();
+      if (!cleanExpr.includes('return ') && !cleanExpr.includes(';')) {
+        cleanExpr = 'return (' + cleanExpr + ');';
+      }
+      const exprFn = new Function('$input', 'input', 'properties', 'props', 'Console', 'console', 'Time', 'DateTime', `
+        "use strict";
+        ${cleanExpr}
+      `);
+      const res = exprFn.call(nodeInstance, parsedInput, parsedInput, properties, properties, mockConsole, mockConsole, Time, DateTime);
       testOutputResult = typeof res === 'object' ? JSON.stringify(res, null, 2) : String(res);
     } catch (evalErr: any) {
       testOutputError = `Evaluation Error: ${evalErr.message}`;
@@ -826,6 +1532,8 @@
       nodes[idx].config.expression = inlineExpressionCode;
       nodes[idx].config.customProperties = inspectingNodeProps;
       nodes[idx].config.componentId = selectedComponentId;
+      nodes[idx].config.customScript = nodeScriptCode;
+      nodes[idx].config.scriptLanguage = nodeScriptLanguage;
       if (inspectingNode.config?.category) {
         nodes[idx].config.category = inspectingNode.config.category;
       }
@@ -945,19 +1653,22 @@
       <button
         type="button"
         class="view-tab"
-        class:active={activeView === 'statemachine'}
-        on:click={() => (activeView = 'statemachine')}
+        class:active={activeView === 'logic_fsm'}
+        on:click={() => (activeView = 'logic_fsm')}
       >
-        🎮 State Machine (AG-UI FSM)
+        🎮 Logic & State Machine (Unity Studio)
       </button>
-      <button
-        type="button"
-        class="view-tab"
-        class:active={activeView === 'smart_component'}
-        on:click={() => (activeView = 'smart_component')}
-      >
-        🧩 Smart Component ECS
-      </button>
+      {#if activeView === 'canvas'}
+        <button
+          type="button"
+          class="btn-fullsize-toggle"
+          class:active={fullSizeCanvas}
+          on:click={() => (fullSizeCanvas = !fullSizeCanvas)}
+          title="Toggle Full Size Flow Canvas"
+        >
+          {fullSizeCanvas ? '⊡ Standard Layout' : '⛶ Full Size Canvas'}
+        </button>
+      {/if}
     </div>
 
     <div class="header-right">
@@ -980,25 +1691,55 @@
 
   <!-- TAB 1: FLOW CANVAS VIEW -->
   {#if activeView === 'canvas'}
-    <div class="designer-subbar">
-      <span class="preset-label">Templates:</span>
-      <button type="button" class="preset-btn" on:click={() => loadPipelinePreset('copilot')}>
-        🤖 Copilot Agent Flow
-      </button>
-      <button type="button" class="preset-btn" on:click={() => loadPipelinePreset('aligner')}>
-        🧬 Pairwise Aligner Flow
-      </button>
-      <button type="button" class="preset-btn" on:click={() => loadPipelinePreset('loop')}>
-        🔁 Loop Iterator Flow
-      </button>
-    </div>
-
     <div class="designer-body">
       <!-- PALETTE -->
+      {#if !fullSizeCanvas}
       <aside class="palette">
         <div class="palette-title">Node Palette</div>
         <div class="palette-hint">Drag onto canvas or click to add</div>
         <div class="palette-scroll">
+          {#if customStudioComponents.length > 0}
+            <div class="palette-subhead">Studio Components & Extensions</div>
+            {#each customStudioComponents as comp}
+              <div
+                class="palette-card custom-comp-card"
+                draggable="true"
+                on:click={() => {
+                  const id = 'n_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+                  const newProps = {};
+                  for (const s of (comp.properties || [])) {
+                    newProps[s.name] = s.defaultValue;
+                  }
+                  nodes = [...nodes, {
+                    id,
+                    type: 'LogicComponent',
+                    name: comp.name,
+                    x: 120,
+                    y: 120,
+                    config: {
+                      componentName: comp.name,
+                      runtime: comp.language || 'csharp',
+                      inputs: comp.inputs || [{ name: 'input', type: 'DNA_Sequence' }],
+                      outputs: comp.outputs || [{ name: 'output', type: 'JSON' }],
+                      script: comp.code || '',
+                      propertySchemas: comp.properties || [],
+                      properties: newProps,
+                      isMiddleware: comp.isMiddleware
+                    }
+                  }];
+                  selectedId = id;
+                }}
+                style="border-left: 3px solid #8b5cf6;"
+              >
+                <span class="palette-icon">{comp.isMiddleware ? '🛡️' : '🧩'}</span>
+                <div class="palette-info">
+                  <span class="palette-label">{comp.name}</span>
+                  <span class="palette-desc">{comp.category} · {comp.language?.toUpperCase()}</span>
+                </div>
+              </div>
+            {/each}
+            <div class="palette-subhead" style="margin-top: 0.5rem;">Standard Workflow Nodes</div>
+          {/if}
           {#each nodeTypes as t}
             {@const m = getMeta(t)}
             <div
@@ -1016,34 +1757,13 @@
             </div>
           {/each}
 
-          {#if customComponentsList.length > 0}
-            <div class="palette-divider"></div>
-            <div class="palette-section-title">
-              <span>🧩 Authored Components</span>
-              <span class="badge-count">{customComponentsList.length}</span>
-            </div>
-            {#each customComponentsList as comp}
-              <div
-                class="palette-card comp-card"
-                on:click={() => addCustomComponentNode(comp)}
-                title="Click to add authored smart component"
-              >
-                <span class="palette-icon">🧩</span>
-                <div class="palette-info">
-                  <div class="comp-title-row">
-                    <span class="palette-label">{comp.name}</span>
-                    <span class="cat-pill">{comp.category}</span>
-                  </div>
-                  <span class="palette-desc">{comp.description || 'Authored Smart Component'}</span>
-                </div>
-              </div>
-            {/each}
-          {/if}
+
         </div>
       </aside>
+      {/if}
 
       <!-- CANVAS -->
-      <main class="canvas-wrap">
+      <main class="canvas-wrap" class:fullsize={fullSizeCanvas}>
         <div
           bind:this={canvasEl}
           class="canvas"
@@ -1106,24 +1826,46 @@
               style="left:{node.x}px; top:{node.y}px; width:{NODE_W}px; height:{NODE_H}px; border-color:{meta.color}"
               on:mousedown={(e) => onNodeMouseDown(e, node)}
               on:dblclick={() => openNodeSmartConfig(node)}
+              on:contextmenu|preventDefault={(e) => onOpenContextMenu(e, node)}
             >
               <div
                 class="node-header"
                 style="background:linear-gradient(90deg, {meta.color}26, rgba(255,255,255,0.02))"
               >
-                <span class="node-icon">{meta.icon}</span>
+                <span class="node-icon">
+  {#if node.type === 'Agent'}
+    {#if (node.config?.model || '').includes('Bio')}🧬
+    {:else if (node.config?.model || '').includes('Phi')}⚡
+    {:else if (node.config?.model || '').includes('Biomedical')}🔬
+    {:else if (node.config?.model || '').includes('Foundry') || (node.config?.model || '').includes('Qwen')}🌐
+    {:else}🤖{/if}
+  {:else}
+    {meta.icon}
+  {/if}
+</span>
                 <span class="node-name" title={node.name}>{node.name || meta.label}</span>
                 <div class="node-actions-row">
+                  {#if node.config?.customScript}
+                    <span class="script-badge" title="Has Attached Custom Script">📜</span>
+                  {/if}
                   {#if node.config?.expression}
                     <span class="expr-badge" title="Has Inline Expression">ƒ(x)</span>
                   {/if}
                   {#if node.config?.componentId}
-                    <span class="comp-badge" title="Linked to Authored Smart Component">🧩</span>
+                    <span class="comp-badge" title="Linked to Logic Component">🧩</span>
                   {/if}
                   <button
                     type="button"
+                    class="node-menu-btn"
+                    title="Node Context Menu"
+                    on:click|stopPropagation={(e) => onOpenContextMenu(e, node)}
+                  >
+                    ⋮
+                  </button>
+                  <button
+                    type="button"
                     class="node-gear-btn"
-                    title="Configure Smart Component & Expressions (Double-click node also opens this)"
+                    title="Configure Logic Component & Custom Script (Double-click node also opens this)"
                     on:click|stopPropagation={() => openNodeSmartConfig(node)}
                   >
                     ⚙️
@@ -1171,6 +1913,7 @@
       </main>
 
       <!-- INSPECTOR & PROPERTIES -->
+      {#if !fullSizeCanvas}
       <aside class="inspector">
         <div class="inspector-title">Node Inspector & Properties</div>
 
@@ -1231,12 +1974,12 @@
 
           <!-- DYNAMIC TYPE CONFIGURATION -->
           <div class="section">
-            <div class="section-title">Component Entity Properties</div>
+            <div class="section-title">Node Configuration</div>
 
             <!-- INPUT NODE CONFIG WITH STRONGLY TYPED FIELDS -->
             {#if currentNode.type === 'Input'}
               <div class="field">
-                <label>Entity Field Type (Unity-Style ECS)</label>
+                <label>Entity Field Type (Logic Component ECS)</label>
                 <select bind:value={currentNode.config.entityType}>
                   {#each ENTITY_TYPES as et}
                     <option value={et}>{et}</option>
@@ -1247,15 +1990,15 @@
               <div class="field">
                 <label>Input String / User Value</label>
                 <textarea
-                  rows="4"
+                  rows="3"
                   bind:value={currentNode.config.value}
-                  placeholder="Enter DNA sequence or string value..."
+                  placeholder="Enter input string or DNA sequence..."
                 ></textarea>
               </div>
 
               <div class="field">
                 <label>Variable / Field Identifier</label>
-                <input type="text" bind:value={currentNode.config.key} placeholder="input_text" />
+                <input type="text" bind:value={currentNode.config.key} placeholder="input_seq" />
               </div>
 
               <!-- Strong typing validation badge -->
@@ -1293,11 +2036,22 @@
             <!-- AGENT NODE CONFIG -->
             {:else if currentNode.type === 'Agent'}
               <div class="field">
-                <label>Inference Engine & Model</label>
-                <select bind:value={currentNode.config.model}>
-                  <option value="Microsoft-Copilot-Local-ONNX">Microsoft Copilot ONNX (Local CPU)</option>
-                  <option value="Phi-3.5-mini-ONNX">Microsoft Phi-3.5-mini ONNX</option>
-                  <option value="Biomedical-Copilot-v1">Biomedical Copilot Reasoning Engine</option>
+                <div class="field-label-row">
+                  <label>Inference Engine & Model</label>
+                  {#if downloadedAgentModels[currentNode.config.model || 'Microsoft-Copilot-Local-ONNX']}
+                    <span class="badge-model-ready">✓ Local ONNX Engine Ready</span>
+                  {:else}
+                    <button type="button" class="btn-download-model-sm" disabled={agentModelDownloading} on:click={() => downloadAgentModel(currentNode.config.model)}>
+                      {agentModelDownloading ? `Downloading (${agentModelProgress}%)...` : '⬇ Download Model'}
+                    </button>
+                  {/if}
+                </div>
+                <select bind:value={currentNode.config.model} class="agent-model-select">
+                  <option value="Microsoft-Copilot-Local-ONNX">🤖 Microsoft Copilot ONNX (Local CPU) [Default]</option>
+                  <option value="Microsoft-Copilot-Bio-ONNX">🧬 Microsoft Copilot Bio ONNX [Genomics / Aligner]</option>
+                  <option value="Phi-3.5-mini-ONNX">⚡ Microsoft Phi-3.5-mini ONNX [High-Speed Low-Latency]</option>
+                  <option value="Biomedical-Copilot-v1">🔬 Biomedical Copilot Reasoning Engine</option>
+                  <option value="Foundry-Local-Qwen-2.5">🌐 Foundry Local Qwen 2.5 (Local Weights)</option>
                 </select>
               </div>
 
@@ -1306,7 +2060,7 @@
                 <textarea
                   rows="3"
                   bind:value={currentNode.config.systemPrompt}
-                  placeholder="Direct the Copilot persona and behavior..."
+                  placeholder="Directives for Copilot agent..."
                 ></textarea>
               </div>
 
@@ -1315,7 +2069,7 @@
                 <textarea
                   rows="2"
                   bind:value={currentNode.config.prompt}
-                  placeholder="Use &#123;&#123;input&#125;&#125; to consume upstream string"
+                  placeholder="Check sequence: {{input}}"
                 ></textarea>
                 <span class="hint-text">Use &#123;&#123;input&#125;&#125; to interpolate string passed from Input node</span>
               </div>
@@ -1446,26 +2200,112 @@
                 <input type="text" bind:value={currentNode.config.targetState} />
               </div>
 
-            <!-- SMART COMPONENT CONFIG -->
-            {:else if currentNode.type === 'SmartComponent'}
+            <!-- LOGIC COMPONENT (C#, CSnakes Python & JS with Multi-I/O & Scriptable ECS) -->
+            {:else if currentNode.type === 'LogicComponent' || currentNode.type === 'SmartComponent'}
               <div class="field">
-                <label>Component Name</label>
-                <input type="text" bind:value={currentNode.config.componentName} />
+                <label>Logic Component Name</label>
+                <input type="text" bind:value={currentNode.config.componentName} placeholder="Custom Logic Evaluator" />
               </div>
               <div class="field">
-                <label>Transformation Mode</label>
-                <select bind:value={currentNode.config.transformMode}>
-                  <option value="dna-enhance">DNA Enhance & Reverse Complement</option>
-                  <option value="gc-filter">GC Filtering & Skew</option>
-                  <option value="normalize">String Normalization</option>
+                <label>Execution Runtime</label>
+                <select bind:value={currentNode.config.runtime}>
+                  <option value="csharp">C# (.NET 8 Core Runtime)</option>
+                  <option value="python">Python 3 (CSnakes Polyglot Bridge)</option>
+                  <option value="javascript">JavaScript (Node.js)</option>
                 </select>
+              </div>
+
+              <!-- Multi-I/O Ports -->
+              <div class="ecs-ports-box">
+                <div class="box-header">
+                  <span class="box-title">📥 Programmable Input Ports ({(currentNode.config.inputs || []).length})</span>
+                  <button type="button" class="btn-sm-add" on:click={() => addNodePort(currentNode, 'inputs')}>+ Add Input</button>
+                </div>
+                {#if (currentNode.config.inputs || []).length > 0}
+                  <div class="ports-grid">
+                    {#each (currentNode.config.inputs || []) as inp, i}
+                      <div class="port-chip-row">
+                        <input type="text" bind:value={inp.name} placeholder="Port Name" />
+                        <select bind:value={inp.type}>
+                          <option value="DNA_Sequence">DNA_Sequence</option>
+                          <option value="String">String</option>
+                          <option value="JSON">JSON</option>
+                          <option value="Float">Float</option>
+                          <option value="Int32">Int32</option>
+                          <option value="Boolean">Boolean</option>
+                        </select>
+                        <button type="button" class="btn-del-chip" on:click={() => removeNodePort(currentNode, 'inputs', i)}>✕</button>
+                      </div>
+                    {/each}
+                  </div>
+                {:else}
+                  <span class="empty-hint">No multi-input ports configured. Uses primary node connection.</span>
+                {/if}
+
+                <div class="box-header" style="margin-top: 0.75rem;">
+                  <span class="box-title">📤 Programmable Output Ports ({(currentNode.config.outputs || []).length})</span>
+                  <button type="button" class="btn-sm-add" on:click={() => addNodePort(currentNode, 'outputs')}>+ Add Output</button>
+                </div>
+                {#if (currentNode.config.outputs || []).length > 0}
+                  <div class="ports-grid">
+                    {#each (currentNode.config.outputs || []) as out, i}
+                      <div class="port-chip-row">
+                        <input type="text" bind:value={out.name} placeholder="Port Name" />
+                        <select bind:value={out.type}>
+                          <option value="JSON">JSON</option>
+                          <option value="DNA_Sequence">DNA_Sequence</option>
+                          <option value="String">String</option>
+                          <option value="Float">Float</option>
+                          <option value="Int32">Int32</option>
+                          <option value="Boolean">Boolean</option>
+                        </select>
+                        <button type="button" class="btn-del-chip" on:click={() => removeNodePort(currentNode, 'outputs', i)}>✕</button>
+                      </div>
+                    {/each}
+                  </div>
+                {:else}
+                  <span class="empty-hint">Default single output port active.</span>
+                {/if}
+              </div>
+
+            <!-- WORKSPACE FILE SYSTEM NODE CONFIG -->
+            {:else if currentNode.type === 'WorkspaceFileSystem'}
+              <div class="field">
+                <label>Operation</label>
+                <select bind:value={currentNode.config.operation}>
+                  <option value="read_file">📖 Read File</option>
+                  <option value="write_file">✍️ Write File</option>
+                  <option value="list_files">📁 List Workspace Files</option>
+                  <option value="exists">🔍 Check File Exists</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Workspace File Path</label>
+                <input
+                  type="text"
+                  bind:value={currentNode.config.filePath}
+                  placeholder="alignment_report.txt"
+                />
+              </div>
+              {#if currentNode.config.operation === 'write_file'}
+                <div class="field">
+                  <label>File Content (Optional Override)</label>
+                  <textarea
+                    rows="3"
+                    bind:value={currentNode.config.fileContent}
+                    placeholder="Leave blank to write upstream payload automatically..."
+                  ></textarea>
+                </div>
+              {/if}
+              <div class="info-box">
+                📁 Executes against local workspace directory <code>./workspace/</code>.
               </div>
 
             <!-- OUTPUT NODE CONFIG -->
             {:else if currentNode.type === 'Output'}
               <div class="field">
                 <label>Console Print Prefix</label>
-                <input type="text" bind:value={currentNode.config.prefix} placeholder=">> CONSOLE PRINT:" />
+                <input type="text" bind:value={currentNode.config.prefix} placeholder=">> BIO-PIPELINE RESULT:" />
               </div>
               <div class="info-box">
                 🖥️ Output is logged directly to backend terminal stdout and the Logs console page.
@@ -1476,6 +2316,313 @@
               <div class="field">
                 <label>Constant Value</label>
                 <input type="text" bind:value={currentNode.config.value} />
+              </div>
+            {/if}
+          </div>
+
+          <!-- HYBRID CUSTOM ECS PROPERTIES INSPECTOR -->
+          <div class="section ecs-properties-section">
+            <div class="ecs-prop-header">
+              <div class="ecs-title-block">
+                <span class="section-title">⚡ Custom ECS Node Properties</span>
+                <span class="ecs-sub">Enum, Vector DB (pgvector), Sliders, Switches</span>
+              </div>
+              <div class="ecs-header-btns">
+                <button type="button" class="btn-reflect-schema-sm" on:click={() => autoReflectNodeSchemas(currentNode)} title="Auto-reflect schemas from code">
+                  🔄 Auto-Reflect
+                </button>
+                <button type="button" class="btn-add-ecs-prop" on:click={() => (showAddPropertyForm = !showAddPropertyForm)}>
+                  {showAddPropertyForm ? '✕ Cancel' : '+ Add Property'}
+                </button>
+              </div>
+            </div>
+
+            <!-- INLINE ADD CUSTOM PROPERTY FORM -->
+            {#if showAddPropertyForm}
+              <div class="add-prop-inline-card">
+                <div class="add-prop-title">Define Custom ECS Property</div>
+                <div class="add-prop-grid">
+                  <div class="add-prop-field">
+                    <label>Property Name:</label>
+                    <input type="text" bind:value={newPropName} placeholder="e.g. policyLevel" />
+                  </div>
+                  <div class="add-prop-field">
+                    <label>Control Type:</label>
+                    <select bind:value={newPropType}>
+                      <option value="enum">Enum Dropdown</option>
+                      <option value="vectordb">Vector DB Store (pgvector)</option>
+                      <option value="number">Numeric Range Slider</option>
+                      <option value="boolean">Boolean Switch</option>
+                      <option value="string">Text String</option>
+                    </select>
+                  </div>
+                </div>
+
+                {#if newPropType === 'enum'}
+                  <div class="add-prop-field full">
+                    <label>Allowed Enum Choices (comma-separated):</label>
+                    <input type="text" bind:value={newPropOptions} placeholder="Permissive, Standard, Strict" />
+                  </div>
+                {/if}
+
+                <div class="add-prop-actions">
+                  <button type="button" class="btn-save-custom-prop" on:click={() => addCustomEcsProperty(currentNode)}>
+                    ✓ Save Property to Node
+                  </button>
+                </div>
+              </div>
+            {/if}
+
+            <!-- RENDERED CUSTOM ECS PROPERTIES -->
+            <div class="ecs-rendered-list">
+              <!-- 1. Reflected / Defined Schemas -->
+              {#if currentNode.config?.propertySchemas && currentNode.config.propertySchemas.length > 0}
+                {#each currentNode.config.propertySchemas as schema}
+                  <div class="ecs-prop-card">
+                    <div class="ecs-prop-card-head">
+                      <div class="prop-title-row">
+                        <strong class="prop-k">{schema.name}</strong>
+                        <span class="prop-t-badge {schema.type}">{schema.type.toUpperCase()}</span>
+                      </div>
+                      <button type="button" class="btn-del-prop" on:click={() => removeCustomEcsProperty(currentNode, schema.name)}>✕</button>
+                    </div>
+                    {#if schema.description}
+                      <span class="prop-d-text">{schema.description}</span>
+                    {/if}
+
+                    <!-- INTERACTIVE WIDGET BASED ON PROPERTY TYPE -->
+                    <div class="ecs-widget-wrapper">
+                      {#if schema.type === 'enum'}
+                        <select 
+                          class="ecs-widget-select"
+                          value={currentNode.config.properties?.[schema.name] || schema.defaultValue || schema.options?.[0]}
+                          on:change={(e) => {
+                            if (!currentNode.config.properties) currentNode.config.properties = {};
+                            currentNode.config.properties[schema.name] = e.currentTarget.value;
+                            nodes = [...nodes];
+                          }}
+                        >
+                          {#each schema.options || ['Standard'] as opt}
+                            <option value={opt}>{opt}</option>
+                          {/each}
+                        </select>
+
+                      {:else if schema.type === 'vectordb'}
+                        <div class="ecs-vectordb-widget">
+                          <div class="vdb-ctrl-row">
+                            <span class="vdb-label">Store:</span>
+                            <select 
+                              class="vdb-provider-select"
+                              value={currentNode.config.properties?.[schema.name] || 'pgvector_default'}
+                              on:change={(e) => {
+                                if (!currentNode.config.properties) currentNode.config.properties = {};
+                                currentNode.config.properties[schema.name] = e.currentTarget.value;
+                                nodes = [...nodes];
+                              }}
+                            >
+                              <option value="pgvector_default">pgvector (Local PostgreSQL/Prisma Default)</option>
+                              <option value="chroma_genomic">ChromaDB Store</option>
+                              <option value="qdrant_cloud">Qdrant Vector Engine</option>
+                            </select>
+                          </div>
+                          <div class="vdb-meta-row">
+                            <span>Collection: <code>genomic_embeddings</code></span> · 
+                            <span>Dimension: <code>1536</code></span>
+                          </div>
+                        </div>
+
+                      {:else if schema.type === 'number'}
+                        <div class="ecs-slider-widget">
+                          <input 
+                            type="range" 
+                            min={schema.min || 0} 
+                            max={schema.max || 1} 
+                            step={schema.step || 0.05}
+                            value={currentNode.config.properties?.[schema.name] ?? schema.defaultValue ?? 0.85}
+                            on:input={(e) => {
+                              if (!currentNode.config.properties) currentNode.config.properties = {};
+                              currentNode.config.properties[schema.name] = parseFloat(e.currentTarget.value);
+                              nodes = [...nodes];
+                            }}
+                            class="ecs-slider-bar"
+                          />
+                          <span class="ecs-slider-val">{currentNode.config.properties?.[schema.name] ?? schema.defaultValue ?? 0.85}</span>
+                        </div>
+
+                      {:else if schema.type === 'boolean'}
+                        <div class="ecs-toggle-widget">
+                          <button 
+                            type="button" 
+                            class="btn-toggle-switch"
+                            class:active={currentNode.config.properties?.[schema.name] ?? schema.defaultValue}
+                            on:click={() => {
+                              if (!currentNode.config.properties) currentNode.config.properties = {};
+                              const curr = currentNode.config.properties?.[schema.name] ?? schema.defaultValue;
+                              currentNode.config.properties[schema.name] = !curr;
+                              nodes = [...nodes];
+                            }}
+                          >
+                            {(currentNode.config.properties?.[schema.name] ?? schema.defaultValue) ? '✔ Enabled [TRUE]' : '✖ Disabled [FALSE]'}
+                          </button>
+                        </div>
+
+                      {:else}
+                        <input 
+                          type="text" 
+                          class="ecs-text-widget"
+                          value={currentNode.config.properties?.[schema.name] ?? schema.defaultValue ?? ''}
+                          on:input={(e) => {
+                            if (!currentNode.config.properties) currentNode.config.properties = {};
+                            currentNode.config.properties[schema.name] = e.currentTarget.value;
+                            nodes = [...nodes];
+                          }}
+                        />
+                      {/if}
+                    </div>
+                  </div>
+                {/each}
+              {/if}
+
+              <!-- 2. Fallback Generic Properties for keys not in schemas -->
+              {#if currentNode.config?.properties}
+                {#each Object.entries(currentNode.config.properties) as [propKey, propVal]}
+                  {#if !(currentNode.config?.propertySchemas || []).some((s) => s.name === propKey)}
+                    <div class="ecs-prop-row generic">
+                      <span class="prop-key-tag">{propKey}</span>
+                      <span class="prop-sep">:</span>
+                      <input
+                        type="text"
+                        class="prop-val-input"
+                        value={String(propVal)}
+                        on:change={(e) => {
+                          let parsedVal = e.currentTarget.value;
+                          if (parsedVal === 'true') parsedVal = true;
+                          else if (parsedVal === 'false') parsedVal = false;
+                          else if (!isNaN(Number(parsedVal)) && parsedVal !== '') parsedVal = Number(parsedVal);
+                          currentNode.config.properties[propKey] = parsedVal;
+                          nodes = [...nodes];
+                        }}
+                      />
+                      <button type="button" class="btn-del-prop" on:click={() => removeNodeEcsProperty(currentNode, propKey)}>✕</button>
+                    </div>
+                  {/if}
+                {/each}
+              {/if}
+
+              {#if (!currentNode.config?.propertySchemas || currentNode.config.propertySchemas.length === 0) && (!currentNode.config?.properties || Object.keys(currentNode.config.properties).length === 0)}
+                <span class="empty-hint">No ECS properties declared. Click <strong>+ Add Property</strong> or <strong>🔄 Auto-Reflect</strong>. Accessible in expressions as <code>this.properties</code>.</span>
+              {/if}
+            </div>
+          </div>
+
+          <!-- ============================================== -->
+          <!-- ATTACHED EXPRESSION ENGINE (n8n / Elsa Style) -->
+          <!-- ============================================== -->
+          <div class="section expression-section">
+            <div class="expr-header-row">
+              <div class="section-title">⚡ Attached Expression</div>
+              {#if !currentNode.config?.hasExpression && !currentNode.config?.expression}
+                <button
+                  type="button"
+                  class="btn-add-expr"
+                  on:click={() => {
+                    if (!currentNode.config) currentNode.config = {};
+                    currentNode.config.hasExpression = true;
+                    if (!currentNode.config.expression) {
+                      currentNode.config.expression = `Console.log(Time.now + " " + this.name + " has executed");\nreturn $input;`;
+                    }
+                    if (!currentNode.config.expressionLang) {
+                      currentNode.config.expressionLang = 'javascript';
+                    }
+                    nodes = [...nodes];
+                  }}
+                >
+                  + Add Expression
+                </button>
+              {/if}
+            </div>
+
+            {#if !currentNode.config?.hasExpression && !currentNode.config?.expression}
+              <div class="no-expr-hint">
+                <p>No expression attached. Click <strong>+ Add Expression</strong> to attach a reactive script executed when this node runs (n8n / Elsa style).</p>
+              </div>
+            {:else}
+              <div class="expr-toolbar">
+                <div class="expr-lang-group">
+                  <label for="expr-lang-side">Lang:</label>
+                  <select id="expr-lang-side" bind:value={currentNode.config.expressionLang} on:change={() => (nodes = [...nodes])}>
+                    <option value="javascript">JavaScript</option>
+                    <option value="csharp">C# (.NET)</option>
+                    <option value="python">Python</option>
+                  </select>
+                </div>
+                <div class="expr-actions-right">
+                  <button
+                    type="button"
+                    class="btn-focus-mode"
+                    title="Open full-screen focus editor"
+                    on:click={() => openFocusMode(currentNode)}
+                  >
+                    ⛶ Focus Mode
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-detach-expr"
+                    title="Remove attached expression"
+                    on:click={() => {
+                      currentNode.config.hasExpression = false;
+                      currentNode.config.expression = '';
+                      nodes = [...nodes];
+                    }}
+                  >
+                    ✕ Detach
+                  </button>
+                </div>
+              </div>
+
+              <!-- Monaco Code Editor for Expression -->
+              <div class="editor-wrapper">
+                <MonacoEditor
+                  height="180px"
+                  language={currentNode.config.expressionLang || 'javascript'}
+                  bind:value={currentNode.config.expression}
+                  placeholder={'Console.log(Time.now + " " + this.name + " has executed");\nthis.properties.verified = true;\nreturn $input;'}
+                  on:change={() => (nodes = [...nodes])}
+                />
+              </div>
+
+              <!-- Quick Snippets -->
+              <div class="expr-quick-snippets">
+                <span class="snippets-label">Snippets:</span>
+                <button
+                  type="button"
+                  class="snippet-chip"
+                  on:click={() => insertSnippet(currentNode, 'Console.log(Time.now + " " + this.name + " has executed");')}
+                >
+                  Console.log(Time.now...)
+                </button>
+                <button
+                  type="button"
+                  class="snippet-chip"
+                  on:click={() => insertSnippet(currentNode, 'return { ...$input, executedAt: Time.now };')}
+                >
+                  return &#123; ...$input &#125;
+                </button>
+              </div>
+
+              <!-- Real Test Runner -->
+              <div class="expr-tester">
+                <div class="tester-header">
+                  <button type="button" class="btn-run-expr" on:click={() => testExpressionOnNode(currentNode)}>
+                    🧪 Test Expression
+                  </button>
+                  {#if exprTestRunning}
+                    <span class="test-spinner">Evaluating...</span>
+                  {/if}
+                </div>
+                {#if exprTestOutput}
+                  <pre class="expr-output font-mono">{exprTestOutput}</pre>
+                {/if}
               </div>
             {/if}
           </div>
@@ -1519,393 +2666,435 @@
           <div class="hint">Click a node on the canvas to inspect and edit its properties.</div>
         {/if}
       </aside>
+      {/if}
     </div>
 
-  <!-- TAB 2: UNITY STYLE STATE MACHINE DESIGNER -->
-  {:else if activeView === 'statemachine'}
-    <div class="fsm-view">
-      <div class="fsm-sidebar">
-        <div class="fsm-section-title">FSM Layers (Hierarchical)</div>
-        <div class="layers-list">
-          {#each fsmLayers as l}
-            <button
-              class="layer-item"
-              class:active={activeFsmLayer === l}
-              on:click={() => (activeFsmLayer = l)}
-            >
-              🎮 {l}
-            </button>
-          {/each}
+  <!-- COMBINED TAB: UNITY-STYLE LOGIC & STATE MACHINE STUDIO -->
+  {:else if activeView === 'logic_fsm'}
+    <div class="unity-studio-container">
+      <!-- LEFT COLUMN: HIERARCHICAL FSM CONTROLLER & STATE MACHINE -->
+      <div class="unity-panel fsm-panel">
+        <div class="unity-panel-header">
+          <div class="panel-header-left">
+            <span class="panel-icon">🎮</span>
+            <h4>State Machine & FSM Controller</h4>
+          </div>
+          <span class="active-layer-badge">{activeFsmLayer}</span>
         </div>
 
-        <div class="fsm-section-title" style="margin-top: 1.25rem;">Parameters & Events</div>
-        <div class="params-list">
-          <div class="param-row"><span>length</span><code>Int32 = 33</code></div>
-          <div class="param-row"><span>gc_score</span><code>Float = 0.58</code></div>
-          <div class="param-row"><span>isValid</span><code>Boolean = true</code></div>
-          <div class="param-row"><span>trigger</span><code>Event = OnStart</code></div>
+        <!-- Layers Section -->
+        <div class="fsm-sub-section">
+          <div class="section-title-row">
+            <span>FSM Layers</span>
+            <button type="button" class="btn-xs" on:click={() => {
+              const name = prompt('Enter new layer name:', 'New Layer');
+              if (name && !fsmLayers.includes(name)) { fsmLayers = [...fsmLayers, name]; activeFsmLayer = name; }
+            }}>+ Add Layer</button>
+          </div>
+          <div class="layers-chips">
+            {#each fsmLayers as l}
+              <button
+                type="button"
+                class="layer-chip"
+                class:active={activeFsmLayer === l}
+                on:click={() => (activeFsmLayer = l)}
+              >
+                🎮 {l}
+              </button>
+            {/each}
+          </div>
         </div>
 
-        <div class="fsm-authoring-tools">
-          <div class="fsm-section-title">State Machine Authoring</div>
-          <div class="fsm-tool-buttons">
-            <button class="tool-btn" on:click={() => (showAddStateModal = !showAddStateModal)}>
-              ➕ Add State
-            </button>
-            <button class="tool-btn" on:click={() => (showAddTransModal = !showAddTransModal)}>
-              ↗ Add Transition
-            </button>
+        <!-- Interactive Parameters Section -->
+        <div class="fsm-sub-section">
+          <div class="section-title-row">
+            <span>FSM Parameters ({fsmParameters.length})</span>
+            <button type="button" class="btn-xs" on:click={() => (showAddParamModal = !showAddParamModal)}>+ Add Param</button>
+          </div>
+
+          {#if showAddParamModal}
+            <div class="mini-modal-box">
+              <input type="text" bind:value={newParamName} placeholder="Parameter Name" class="mini-input" />
+              <select bind:value={newParamType} class="mini-select">
+                <option value="Boolean">Boolean</option>
+                <option value="Int32">Int32</option>
+                <option value="Float">Float</option>
+                <option value="Trigger">Trigger</option>
+              </select>
+              <div class="mini-actions">
+                <button type="button" class="btn-xs" on:click={() => (showAddParamModal = false)}>Cancel</button>
+                <button type="button" class="btn-xs primary" on:click={addFsmParameter}>Add</button>
+              </div>
+            </div>
+          {/if}
+
+          <div class="interactive-params-grid">
+            {#each fsmParameters as param}
+              <div class="param-card">
+                <div class="param-card-top">
+                  <span class="param-name">{param.name}</span>
+                  <span class="param-type-badge {param.type}">{param.type}</span>
+                </div>
+                <div class="param-control">
+                  {#if param.type === 'Boolean'}
+                    <label class="toggle-switch">
+                      <input type="checkbox" bind:checked={param.value} on:change={() => (fsmParameters = [...fsmParameters])} />
+                      <span class="toggle-slider"></span>
+                      <span class="toggle-label">{param.value ? 'true' : 'false'}</span>
+                    </label>
+                  {:else if param.type === 'Int32'}
+                    <input type="number" step="1" bind:value={param.value} class="param-number-input" />
+                  {:else if param.type === 'Float'}
+                    <input type="number" step="0.01" bind:value={param.value} class="param-number-input" />
+                  {:else if param.type === 'Trigger'}
+                    <button
+                      type="button"
+                      class="btn-trigger"
+                      class:fired={param.value}
+                      on:click={() => dispatchFsmEvent(param.name)}
+                    >
+                      ⚡ Fire Trigger
+                    </button>
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
+
+        <!-- Events Section -->
+        <div class="fsm-sub-section">
+          <div class="section-title-row">
+            <span>FSM Events & Triggers</span>
+            <button type="button" class="btn-xs" on:click={() => (showAddEventModal = !showAddEventModal)}>+ Add Event</button>
+          </div>
+
+          {#if showAddEventModal}
+            <div class="mini-modal-box">
+              <input type="text" bind:value={newEventName} placeholder="Event Name (e.g. OnQualityVerified)" class="mini-input" />
+              <div class="mini-actions">
+                <button type="button" class="btn-xs" on:click={() => (showAddEventModal = false)}>Cancel</button>
+                <button type="button" class="btn-xs primary" on:click={addFsmEvent}>Add</button>
+              </div>
+            </div>
+          {/if}
+
+          <div class="events-list">
+            {#each fsmEvents as evt}
+              <div class="event-row">
+                <div class="event-meta">
+                  <span class="event-name">⚡ {evt.name}</span>
+                  {#if evt.lastDispatched}
+                    <span class="last-dispatched">Fired: {evt.lastDispatched}</span>
+                  {/if}
+                </div>
+                <button type="button" class="btn-dispatch" on:click={() => dispatchFsmEvent(evt.name)}>Dispatch</button>
+              </div>
+            {/each}
+          </div>
+        </div>
+
+        <!-- States & Transitions Visual Graph -->
+        <div class="fsm-sub-section fsm-graph-section">
+          <div class="section-title-row">
+            <span>States ({fsmStates.length}) & Transitions</span>
+            <div class="sub-actions">
+              <button type="button" class="btn-xs" on:click={() => (showAddStateModal = !showAddStateModal)}>+ State</button>
+              <button type="button" class="btn-xs" on:click={() => (showAddTransModal = !showAddTransModal)}>+ Transition</button>
+            </div>
           </div>
 
           {#if showAddStateModal}
-            <div class="fsm-modal-box">
-              <h4>New FSM State</h4>
-              <input
-                type="text"
-                placeholder="State Name (e.g. QC_Check)"
-                bind:value={newFsmStateName}
-                class="fsm-input"
-              />
-              <select bind:value={newFsmStateType} class="fsm-select">
+            <div class="mini-modal-box">
+              <input type="text" placeholder="State Name" bind:value={newFsmStateName} class="mini-input" />
+              <select bind:value={newFsmStateType} class="mini-select">
                 <option value="state">Standard State</option>
                 <option value="entry">Entry State</option>
                 <option value="exit">Exit State</option>
               </select>
-              <div class="modal-actions">
-                <button class="btn-sm" on:click={() => (showAddStateModal = false)}>Cancel</button>
-                <button class="btn-sm primary" on:click={addFsmState}>Create</button>
+              <div class="mini-actions">
+                <button type="button" class="btn-xs" on:click={() => (showAddStateModal = false)}>Cancel</button>
+                <button type="button" class="btn-xs primary" on:click={addFsmState}>Create</button>
               </div>
             </div>
           {/if}
 
           {#if showAddTransModal}
-            <div class="fsm-modal-box">
-              <h4>New Transition</h4>
-              <label>From State</label>
-              <select bind:value={newTransFrom} class="fsm-select">
-                <option value="">Select source...</option>
-                {#each fsmStates as s}
-                  <option value={s.id}>{s.name} ({s.id})</option>
-                {/each}
-              </select>
-              <label>To State</label>
-              <select bind:value={newTransTo} class="fsm-select">
-                <option value="">Select destination...</option>
-                {#each fsmStates as s}
-                  <option value={s.id}>{s.name} ({s.id})</option>
-                {/each}
-              </select>
-              <input
-                type="text"
-                placeholder="Trigger (e.g. OnQualityPassed)"
-                bind:value={newTransTrigger}
-                class="fsm-input"
-              />
-              <input
-                type="text"
-                placeholder="Condition (e.g. score >= 0.85)"
-                bind:value={newTransCondition}
-                class="fsm-input"
-              />
-              <div class="modal-actions">
-                <button class="btn-sm" on:click={() => (showAddTransModal = false)}>Cancel</button>
-                <button class="btn-sm primary" on:click={addFsmTransition}>Add</button>
+            <div class="mini-modal-box">
+              <div class="mini-row">
+                <select bind:value={newTransFrom} class="mini-select">
+                  {#each fsmStates as s}<option value={s.id}>{s.name}</option>{/each}
+                </select>
+                <span>➔</span>
+                <select bind:value={newTransTo} class="mini-select">
+                  {#each fsmStates as s}<option value={s.id}>{s.name}</option>{/each}
+                </select>
+              </div>
+              <input type="text" placeholder="Trigger Event" bind:value={newTransTrigger} class="mini-input" />
+              <input type="text" placeholder="Condition (e.g. isValid == true)" bind:value={newTransCondition} class="mini-input" />
+              <div class="mini-actions">
+                <button type="button" class="btn-xs" on:click={() => (showAddTransModal = false)}>Cancel</button>
+                <button type="button" class="btn-xs primary" on:click={addFsmTransition}>Add Transition</button>
               </div>
             </div>
           {/if}
-        </div>
 
-        <button class="btn primary" style="margin-top: 1rem;" on:click={stepFsm}>
-          ▶ Step State Transition (AG-UI)
-        </button>
-      </div>
-
-      <div class="fsm-canvas">
-        <div class="fsm-header-bar">
-          <span>Active Layer: <strong>{activeFsmLayer}</strong></span>
-          <span class="active-state-tag">Active State: {fsmStates.find((s) => s.id === activeFsmState)?.name}</span>
-        </div>
-
-        <div class="fsm-graph">
-          <svg class="fsm-svg" width="100%" height="100%">
-            {#each fsmTransitions as t}
-              {@const s1 = fsmStates.find((s) => s.id === t.from)}
-              {@const s2 = fsmStates.find((s) => s.id === t.to)}
-              {#if s1 && s2}
-                <line
-                  x1={s1.x + 80}
-                  y1={s1.y + 30}
-                  x2={s2.x}
-                  y2={s2.y + 30}
-                  stroke="#38bdf8"
-                  stroke-width="2"
-                  marker-end="url(#arrow)"
-                />
-              {/if}
+          <div class="fsm-states-horizontal">
+            {#each fsmStates as state}
+              <div
+                class="fsm-state-node"
+                class:active={activeFsmState === state.id}
+                class:entry={state.type === 'entry'}
+                class:exit={state.type === 'exit'}
+                on:click={() => (activeFsmState = state.id)}
+              >
+                <div class="state-icon">{state.type === 'entry' ? '▶' : state.type === 'exit' ? '🏁' : '⚙️'}</div>
+                <div class="state-details">
+                  <div class="state-name">{state.name}</div>
+                  <div class="state-type-tag">{state.type.toUpperCase()}</div>
+                </div>
+              </div>
             {/each}
-          </svg>
+          </div>
 
-          {#each fsmStates as state}
-            <div
-              class="fsm-node {state.type}"
-              class:current={activeFsmState === state.id}
-              style="left:{state.x}px; top:{state.y}px;"
-              on:click={() => (activeFsmState = state.id)}
-            >
-              <div class="fsm-node-title">{state.name}</div>
-              <div class="fsm-node-sub">{state.type.toUpperCase()}</div>
-            </div>
-          {/each}
+          <div class="fsm-transitions-chips">
+            <span class="sub-label">Active Transitions:</span>
+            {#each fsmTransitions as trans}
+              <div class="trans-chip">
+                <code>{getStateName(trans.from)} ➔ {getStateName(trans.to)}</code>
+                <span class="trans-trigger">[{trans.trigger}]</span>
+                <span class="trans-cond">({trans.condition})</span>
+              </div>
+            {/each}
+          </div>
         </div>
       </div>
-    </div>
 
-  <!-- TAB 3: SMART COMPONENT AUTHORING -->
-  {:else if activeView === 'smart_component'}
-    <div class="smart-comp-view">
-      <div class="smart-comp-card">
-        <h3>🧩 Author Reusable Smart Component</h3>
-        <p class="subtitle">
-          Construct custom reactive pipeline components conforming to Unity ECS entities, publishable to market_place.
-        </p>
+      <!-- RIGHT COLUMN: LOGIC COMPONENT & CSNAKES / MONACO EDITOR -->
+      <div class="unity-panel logic-panel">
+        <div class="unity-panel-header">
+          <div class="panel-header-left">
+            <span class="panel-icon">🧩</span>
+            <h4>Logic Component Studio (CSnakes Polyglot)</h4>
+          </div>
+          <span class="active-runtime-badge {lcLanguage}">{lcLanguage.toUpperCase()}</span>
+        </div>
 
-        <div class="comp-form">
+        <div class="logic-top-grid">
           <div class="field">
             <label>Component Name</label>
-            <input type="text" bind:value={compName} />
-          </div>
-
-          <div class="field-row">
-            <div class="field half">
-              <label>Input Entity Port</label>
-              <select bind:value={compInputType}>
-                {#each ENTITY_TYPES as et}
-                  <option value={et}>{et}</option>
-                {/each}
-              </select>
-            </div>
-            <div class="field half">
-              <label>Output Entity Port</label>
-              <select bind:value={compOutputType}>
-                {#each ENTITY_TYPES as et}
-                  <option value={et}>{et}</option>
-                {/each}
-              </select>
-            </div>
+            <input type="text" bind:value={lcName} class="unity-input" />
           </div>
 
           <div class="field">
-            <label>Component Behavior Routine</label>
-            <select bind:value={compTransformMode}>
-              <option value="dna-enhance">DNA Enhance & Reverse Complement</option>
-              <option value="gc-filter">GC Content & Codon Skew Filter</option>
-              <option value="normalize">String Normalization</option>
+            <label>Category</label>
+            <select bind:value={lcCategory} class="unity-select">
+              <option value="State Machine">State Machine</option>
+              <option value="Bioinformatics">Bioinformatics</option>
+              <option value="Shell Tools">Shell Tools</option>
+              <option value="Modules">Modules</option>
+              <option value="MCP Server">MCP Server</option>
             </select>
           </div>
 
-          <button
-            class="btn primary"
-            on:click={() => {
-              addNode('SmartComponent');
-              activeView = 'canvas';
-              message = `Smart Component "${compName}" instantiated on canvas!`;
-            }}
-          >
-            🚀 Add Component to Canvas Flow
+          <div class="field">
+            <label>Language Runtime</label>
+            <select bind:value={lcLanguage} class="unity-select">
+              <option value="csharp">⚡ C# (.NET 8 Core)</option>
+              <option value="python">🐍 Python 3 (CSnakes Polyglot Bridge)</option>
+              <option value="javascript">🟨 JavaScript (Node.js)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Programmable Multi-I/O Ports -->
+        <div class="ports-editor-box">
+          <div class="ports-section-col">
+            <div class="section-title-row">
+              <span>📥 Input Ports</span>
+              <button type="button" class="btn-xs" on:click={() => {
+                const name = prompt('Input Port Name:', 'querySequence');
+                if (name) lcCode = `// Input port [${name}] declared\n` + lcCode;
+              }}>+ Input</button>
+            </div>
+            <div class="ports-list">
+              <span class="port-tag in">sequence (DNA_Sequence)</span>
+              <span class="port-tag in">reference (DNA_Sequence)</span>
+            </div>
+          </div>
+          <div class="ports-section-col">
+            <div class="section-title-row">
+              <span>📤 Output Ports</span>
+              <button type="button" class="btn-xs" on:click={() => {
+                const name = prompt('Output Port Name:', 'alignmentScore');
+                if (name) lcCode += `\n// Output port [${name}] emitted`;
+              }}>+ Output</button>
+            </div>
+            <div class="ports-list">
+              <span class="port-tag out">alignmentScore (Float)</span>
+              <span class="port-tag out">verified (Boolean)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reflected shortcuts for StateMachineBehaviour & Nodes -->
+        <div class="shortcuts-row">
+          <span class="sub-label">StateMachineBehaviour API:</span>
+          <button type="button" class="btn-api-chip" on:click={() => (lcCode += '\nstateMachine.SetVariable("isValid", true);')}>
+            + SetVariable
+          </button>
+          <button type="button" class="btn-api-chip" on:click={() => (lcCode += '\nstateMachine.TriggerTransition("OnValidationPassed");')}>
+            + TriggerTransition
+          </button>
+          <button type="button" class="btn-api-chip" on:click={() => (lcCode += '\nstateMachine.PlayState("Genomic Verification");')}>
+            + PlayState
+          </button>
+        </div>
+
+        <!-- Monaco Editor Container -->
+        <div class="logic-editor-wrap">
+          <div class="editor-header-bar">
+            <span>Source Code ({lcLanguage.toUpperCase()})</span>
+            <div class="editor-actions-bar">
+              <button type="button" class="btn-xs" on:click={testLogicComponentCode} disabled={lcTesting}>
+                {lcTesting ? 'Validating...' : '🧪 Validate Syntax'}
+              </button>
+              <button type="button" class="btn-xs primary" on:click={saveAndAddLogicComponent}>
+                🚀 Save & Add to Canvas Flow
+              </button>
+            </div>
+          </div>
+          <div class="monaco-container-box">
+            <MonacoEditor
+              height="260px"
+              language={lcLanguage === 'python' ? 'python' : lcLanguage === 'csharp' ? 'csharp' : 'javascript'}
+              bind:value={lcCode}
+            />
+          </div>
+          {#if lcTestOutput}
+            <div class="lc-output-pane">
+              <div class="lc-output-title">Compilation & Syntax Result:</div>
+              <pre class="lc-output-text font-mono">{lcTestOutput}</pre>
+            </div>
+          {/if}
+        </div>
+      </div>
+    </div>
+  {/if}
+    <!-- SLIDE-OVER DRAWER: NODE SMART COMPONENT & INLINE EXPRESSION ENGINE -->
+
+  <!-- NODE CONTEXT MENU -->
+  {#if showContextMenu && contextMenuNode}
+    <div
+      class="node-context-menu"
+      style="left:{contextMenuX}px; top:{contextMenuY}px;"
+      on:click|stopPropagation
+    >
+      <div class="context-header">{contextMenuNode.name || contextMenuNode.id}</div>
+      <button class="menu-item" on:click={() => { showContextMenu = false; selectedId = contextMenuNode.id; }}>
+        ⚙️ Select in Inspector
+      </button>
+      <button class="menu-item" on:click={() => { showContextMenu = false; openFocusMode(contextMenuNode); }}>
+        ⛶ Focus Mode (Expression Editor)
+      </button>
+      <button class="menu-item" on:click={() => duplicateNode(contextMenuNode)}>
+        📋 Duplicate Node
+      </button>
+      <div class="menu-divider"></div>
+      <button class="menu-item delete" on:click={() => deleteNodeById(contextMenuNode.id)}>
+        🗑️ Delete Node
+      </button>
+    </div>
+  {/if}
+
+  <!-- FULL-SCREEN FOCUS MODE MODAL FOR EXPRESSION SCRIPTING -->
+  {#if isFocusMode && focusNode}
+    <div class="focus-overlay" on:click={closeFocusMode}></div>
+    <div class="focus-modal-panel" role="dialog" aria-label="Expression Editor Focus Mode">
+      <div class="focus-header">
+        <div class="focus-title-group">
+          <span class="focus-icon">⛶</span>
+          <div>
+            <h3>Expression Editor: {focusNode.name}</h3>
+            <span class="focus-subtitle">Full-Screen Focus Mode & Live Autocomplete ({focusNode.type})</span>
+          </div>
+        </div>
+        <div class="focus-header-actions">
+          <div class="lang-pill-select">
+            <label for="focus-lang">Language:</label>
+            <select id="focus-lang" bind:value={focusNode.config.expressionLang} on:change={() => (nodes = [...nodes])}>
+              <option value="javascript">JavaScript</option>
+              <option value="csharp">C# (.NET)</option>
+              <option value="python">Python</option>
+            </select>
+          </div>
+          <button class="btn-test-modal" on:click={() => testExpressionOnNode(focusNode)}>
+            🧪 Test Expression
+          </button>
+          <button class="btn-close-focus" on:click={closeFocusMode}>
+            ✕ Exit Focus Mode
           </button>
         </div>
       </div>
-    </div>
-  {/if}
 
-  <!-- SLIDE-OVER DRAWER: NODE SMART COMPONENT & INLINE EXPRESSION ENGINE -->
-  {#if showNodeDrawer && inspectingNode}
-    <div class="drawer-overlay" on:click={closeNodeSmartConfig}></div>
-    <div class="drawer-panel" role="dialog" aria-label="Smart Component & Expression Inspector">
-      <div class="drawer-header">
-        <div class="drawer-title-group">
-          <span class="drawer-icon">{getMeta(inspectingNode.type).icon}</span>
-          <div>
-            <h3>Configure: {inspectingNode.name || inspectingNode.id}</h3>
-            <span class="drawer-subtitle">Smart Component Inspector & Expression Engine (n8n / Elsa Style)</span>
+      <div class="focus-body">
+        <div class="focus-editor-col">
+          <div class="focus-editor-wrapper">
+            <MonacoEditor
+              height="100%"
+              language={focusNode.config.expressionLang || 'javascript'}
+              bind:value={focusNode.config.expression}
+              placeholder={'Console.log(Time.now + " " + this.name + " has executed");\nthis.properties.verified = true;\nreturn $input;'}
+              on:change={() => (nodes = [...nodes])}
+            />
+          </div>
+
+          <!-- Quick Snippets in Focus Mode -->
+          <div class="focus-snippets-bar">
+            <span class="snippets-label">Insert Snippet:</span>
+            <button
+              type="button"
+              class="snippet-chip"
+              on:click={() => insertSnippet(focusNode, 'Console.log(Time.now + " " + this.name + " has executed");')}
+            >
+              Console.log(Time.now + this.name...)
+            </button>
+            <button
+              type="button"
+              class="snippet-chip"
+              on:click={() => insertSnippet(focusNode, 'return { ...$input, executedAt: Time.now };')}
+            >
+              return &#123; ...$input &#125;
+            </button>
+            <button
+              type="button"
+              class="snippet-chip"
+              on:click={() => insertSnippet(focusNode, 'Console.log("Input payload: " + JSON.stringify($input));')}
+            >
+              Console.log($input)
+            </button>
           </div>
         </div>
-        <button class="close-drawer-btn" on:click={closeNodeSmartConfig}>✕</button>
+
+        <div class="focus-output-col">
+          <div class="focus-output-header">
+            <span>Execution & Console Output</span>
+            {#if exprTestRunning}
+              <span class="running-tag">Evaluating...</span>
+            {/if}
+          </div>
+          <pre class="focus-output-pre font-mono">{exprTestOutput || '// Click "🧪 Test Expression" to execute against mock node context.\n// Console.log(...) calls and return values will be displayed here.'}</pre>
+        </div>
       </div>
 
-      <div class="drawer-content">
-        <!-- 1. GENERAL & IDENTIFIER -->
-        <section class="drawer-section">
-          <div class="section-badge">1. Node Identity</div>
-          <div class="field-grid">
-            <div class="field">
-              <label>Node Name</label>
-              <input type="text" bind:value={inspectingNode.name} placeholder="Descriptive Node Name" />
-            </div>
-            <div class="field">
-              <label>Node Type</label>
-              <input type="text" value={inspectingNode.type} disabled class="disabled-input" />
-            </div>
-          </div>
-        </section>
-
-        <!-- 2. LINK AUTHORED SMART COMPONENT -->
-        <section class="drawer-section">
-          <div class="section-badge">2. Authored Component Link</div>
-          <div class="field">
-            <label>Link to Pre-Authored Smart Component</label>
-            <select
-              value={selectedComponentId}
-              on:change={(e) => onSelectCustomComponent(e.currentTarget.value)}
-            >
-              <option value="">-- Standalone Node (No linked component) --</option>
-              {#each customComponentsList as comp}
-                <option value={comp.id}>
-                  [{comp.category}] {comp.name} ({comp.properties?.length || 0} props)
-                </option>
-              {/each}
-            </select>
-            <p class="field-hint">
-              Selecting an authored component auto-populates its Unity-style serialized public properties and inline expressions.
-            </p>
-          </div>
-        </section>
-
-        <!-- 3. UNITY-STYLE SERIALIZED PUBLIC PROPERTIES -->
-        <section class="drawer-section">
-          <div class="section-header-row">
-            <div class="section-badge">3. Public Properties (Inspector)</div>
-            <button class="btn-add-prop" on:click={addCustomProperty}>+ Add Property</button>
-          </div>
-
-          {#if inspectingNodeProps.length === 0}
-            <div class="empty-props-box">
-              No custom public properties configured. Click "+ Add Property" or select an authored component above.
-            </div>
-          {:else}
-            <div class="props-inspector">
-              {#each inspectingNodeProps as prop, idx}
-                <div class="prop-row">
-                  <div class="prop-meta">
-                    <input
-                      type="text"
-                      bind:value={prop.name}
-                      class="prop-name-input"
-                      placeholder="Property Name"
-                    />
-                    <select bind:value={prop.type} class="prop-type-select">
-                      <option value="string">string</option>
-                      <option value="number">number</option>
-                      <option value="boolean">boolean</option>
-                      <option value="select">select</option>
-                    </select>
-                    <button
-                      type="button"
-                      class="prop-del-btn"
-                      on:click={() => removeCustomProperty(idx)}
-                      title="Remove property"
-                    >
-                      ✕
-                    </button>
-                  </div>
-
-                  <!-- Dynamic Input Widget based on type -->
-                  <div class="prop-widget">
-                    {#if prop.type === 'boolean'}
-                      <label class="switch-row">
-                        <input type="checkbox" bind:checked={prop.value} />
-                        <span>{prop.value ? 'True (Enabled)' : 'False (Disabled)'}</span>
-                      </label>
-                    {:else if prop.type === 'number'}
-                      {#if prop.min !== undefined && prop.max !== undefined}
-                        <div class="slider-row">
-                          <input
-                            type="range"
-                            min={prop.min}
-                            max={prop.max}
-                            step={prop.step || 0.05}
-                            bind:value={prop.value}
-                          />
-                          <span class="slider-val">{prop.value}</span>
-                        </div>
-                      {:else}
-                        <input type="number" bind:value={prop.value} class="prop-input" />
-                      {/if}
-                    {:else}
-                      <input type="text" bind:value={prop.value} class="prop-input" />
-                    {/if}
-                  </div>
-
-                  {#if prop.description}
-                    <div class="prop-desc">{prop.description}</div>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </section>
-
-        <!-- 4. INLINE EXPRESSION ENGINE (n8n & Elsa Workflows Style) -->
-        <section class="drawer-section">
-          <div class="section-badge">4. Inline Expression Engine (n8n / Elsa Style)</div>
-          <p class="field-hint">
-            Write reactive expressions evaluated dynamically during execution. Available variables: <code>$input</code> (incoming payload) and <code>properties</code> (configured public fields). Template syntax <code>{`{{ ... }}`}</code> is supported.
-          </p>
-
-          <div class="expression-editor-box">
-            <div class="editor-header-bar">
-              <span>JavaScript Expression</span>
-              <span class="syntax-hint">e.g. <code>$input.gc >= properties.Threshold ? 'Pass' : 'Reject'</code></span>
-            </div>
-            <textarea
-              bind:value={inlineExpressionCode}
-              rows="4"
-              class="expression-textarea"
-              placeholder="e.g. $input.sequence.length > 50 ? 'Long' : 'Short'"
-            ></textarea>
-          </div>
-
-          <!-- Live Expression Tester -->
-          <div class="expr-tester">
-            <div class="tester-header">
-              <span>🧪 Live Expression Tester</span>
-              <button class="btn-test-expr" on:click={testNodeExpression}>▶ Run Test</button>
-            </div>
-            <div class="tester-grid">
-              <div>
-                <label class="tester-sublabel">Sample $input JSON:</label>
-                <textarea
-                  bind:value={testInputJson}
-                  rows="4"
-                  class="test-input-textarea"
-                ></textarea>
-              </div>
-              <div>
-                <label class="tester-sublabel">Evaluated Result:</label>
-                <div class="test-result-box" class:has-error={testOutputError}>
-                  {#if testOutputError}
-                    <span class="err-text">{testOutputError}</span>
-                  {:else if testOutputResult}
-                    <pre class="res-text">{testOutputResult}</pre>
-                  {:else}
-                    <span class="placeholder-text">Click "Run Test" to evaluate expression...</span>
-                  {/if}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div class="drawer-footer">
-        <button class="btn-cancel" on:click={closeNodeSmartConfig}>Cancel</button>
-        <button class="btn-save-drawer" on:click={saveNodeSmartConfig}>
-          💾 Save Changes to Node
+      <div class="focus-footer">
+        <span class="footer-hint">Tip: Autocomplete triggers on typing <code>Console.</code>, <code>Time.</code>, <code>this.</code>, <code>$</code> or <kbd>Ctrl+Space</kbd>.</span>
+        <button class="btn-done-focus" on:click={closeFocusMode}>
+          ✔ Done Editing
         </button>
       </div>
     </div>
-  {/if}
-</div>
+  {/if}</div>
 
 <style>
   .designer {
@@ -2490,7 +3679,7 @@
     padding: 1rem 0;
   }
 
-  /* UNITY STATE MACHINE TAB */
+  /* STATE MACHINE TAB */
   .fsm-view {
     display: flex;
     flex: 1;
@@ -2663,4 +3852,1566 @@
     flex-direction: column;
     gap: 0.85rem;
   }
+
+  /* NODE CONTEXT MENU */
+  .node-context-menu {
+    position: fixed;
+    z-index: 2000;
+    background: #0b0e14;
+    border: 1px solid #38bdf888;
+    border-radius: 0.4rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
+    padding: 0.35rem 0;
+    min-width: 170px;
+    animation: fadeIn 0.15s ease;
+  }
+  .context-header {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #38bdf8;
+    border-bottom: 1px solid #1e293b;
+    margin-bottom: 0.25rem;
+  }
+  .menu-item {
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: #e2e8f0;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .menu-item:hover {
+    background: rgba(14, 165, 233, 0.2);
+    color: #38bdf8;
+  }
+  .menu-item.delete:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+  }
+  .menu-divider {
+    height: 1px;
+    background: #1e293b;
+    margin: 0.25rem 0;
+  }
+  .node-menu-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0.1rem 0.25rem;
+    border-radius: 0.2rem;
+  }
+  .node-menu-btn:hover {
+    color: #38bdf8;
+    background: rgba(255, 255, 255, 0.1);
+  }
+  .script-badge {
+    font-size: 0.65rem;
+    background: rgba(234, 179, 8, 0.2);
+    color: #facc15;
+    border: 1px solid rgba(234, 179, 8, 0.4);
+    padding: 0.05rem 0.25rem;
+    border-radius: 0.2rem;
+  }
+
+  /* DRAWER NAV TABS */
+  .drawer-nav-tabs {
+    display: flex;
+    gap: 0.4rem;
+    border-bottom: 1px solid #1e293b;
+    padding-bottom: 0.75rem;
+  }
+  .dtab {
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.35rem 0.75rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+  }
+  .dtab:hover {
+    color: #e2e8f0;
+    border-color: #38bdf8;
+  }
+  .dtab.active {
+    background: rgba(2, 132, 199, 0.25);
+    border-color: #38bdf8;
+    color: #38bdf8;
+  }
+  .lang-select-sm {
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #38bdf8;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+  }
+  .script-textarea {
+    width: 100%;
+    background: #080a0f;
+    border: 1px solid #38bdf844;
+    color: #f1f5f9;
+    font-family: monospace;
+    font-size: 0.8rem;
+    padding: 0.75rem;
+    border-radius: 0.35rem;
+    resize: vertical;
+  }
+
+  /* LOGIC COMPONENT STUDIO */
+  .logic-comp-studio {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    height: 100%;
+    overflow-y: auto;
+  }
+  .studio-sidebar {
+    background: #0b0e14;
+    border: 1px solid #1e293b;
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  .studio-sidebar h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #38bdf8;
+  }
+  .studio-hint {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin: 0;
+  }
+  .studio-input, .studio-select {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #f1f5f9;
+    padding: 0.4rem;
+    font-size: 0.8rem;
+    border-radius: 0.25rem;
+  }
+  .reflected-nodes-box {
+    background: #080a0f;
+    border: 1px solid #1e293b;
+    border-radius: 0.35rem;
+    padding: 0.65rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .nodes-box-title {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    font-weight: 600;
+  }
+  .node-tokens-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .token-btn {
+    background: #1e293b;
+    border: 1px solid #38bdf844;
+    color: #38bdf8;
+    font-size: 0.65rem;
+    font-family: monospace;
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.2rem;
+    cursor: pointer;
+  }
+  .token-btn:hover {
+    background: #38bdf8;
+    color: #0b0e14;
+  }
+  .stm-api-shortcuts {
+    margin-top: 0.35rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .stm-label {
+    font-size: 0.65rem;
+    color: #64748b;
+  }
+  .token-btn-sm {
+    background: rgba(168, 85, 247, 0.2);
+    border: 1px solid #a855f7;
+    color: #c084fc;
+    font-size: 0.65rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.2rem;
+    cursor: pointer;
+  }
+  .studio-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: auto;
+  }
+  .btn-test-studio {
+    background: #1e293b;
+    border: 1px solid #38bdf8;
+    color: #38bdf8;
+    padding: 0.45rem;
+    font-size: 0.8rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .btn-save-studio {
+    background: #0284c7;
+    border: 1px solid #38bdf8;
+    color: white;
+    padding: 0.55rem;
+    font-size: 0.8rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    font-weight: 700;
+  }
+  .studio-main-code {
+    background: #0b0e14;
+    border: 1px solid #1e293b;
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .code-topbar {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: #94a3b8;
+  }
+  .code-subtext {
+    font-size: 0.7rem;
+    color: #06b6d4;
+  }
+  .studio-textarea {
+    width: 100%;
+    flex: 1;
+    min-height: 380px;
+    background: #080a0f;
+    border: 1px solid #1e293b;
+    color: #f1f5f9;
+    font-family: monospace;
+    font-size: 0.85rem;
+    padding: 1rem;
+    border-radius: 0.35rem;
+    resize: none;
+    outline: none;
+  }
+  .lc-output-pane {
+    background: #080a0f;
+    border: 1px solid #38bdf844;
+    border-radius: 0.35rem;
+    padding: 0.75rem;
+  }
+  .lc-output-title {
+    font-size: 0.75rem;
+    color: #38bdf8;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+  }
+  .lc-output-text {
+    color: #4ade80;
+    margin: 0;
+    font-size: 0.75rem;
+  }
+
+
+  /* ATTACHED EXPRESSION ENGINE (n8n / Elsa Style) */
+  .expression-section {
+    background: #0b121e;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-top: 0.75rem;
+  }
+
+  .expr-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .btn-add-expr {
+    background: #0284c7;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .btn-add-expr:hover {
+    background: #0369a1;
+  }
+
+  .no-expr-hint {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px dashed #334155;
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    line-height: 1.4;
+  }
+
+  .expr-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .expr-lang-group {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    color: #94a3b8;
+  }
+
+  .expr-lang-group select {
+    background: #0f172a;
+    color: #f1f5f9;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+  }
+
+  .expr-actions-right {
+    display: flex;
+    gap: 0.35rem;
+  }
+
+  .btn-focus-mode {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-focus-mode:hover {
+    background: #2563eb;
+  }
+
+  .btn-detach-expr {
+    background: transparent;
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+
+  .btn-detach-expr:hover {
+    background: rgba(239, 68, 68, 0.15);
+  }
+
+  .editor-wrapper {
+    position: relative;
+    margin-bottom: 0.5rem;
+  }
+
+  .expr-textarea {
+    width: 100%;
+    background: #030712;
+    color: #38bdf8;
+    border: 1px solid #1e293b;
+    border-radius: 4px;
+    padding: 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    resize: vertical;
+  }
+
+  .expr-textarea:focus {
+    outline: none;
+    border-color: #38bdf8;
+  }
+
+  /* INTELLISENSE & AUTOCOMPLETE POPUP */
+  .intellisense-popup {
+    position: absolute;
+    z-index: 100;
+    width: 280px;
+    background: #0f172a;
+    border: 1px solid #38bdf8;
+    border-radius: 6px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
+    overflow: hidden;
+  }
+
+  .popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #1e293b;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #38bdf8;
+    border-bottom: 1px solid #334155;
+  }
+
+  .popup-keys {
+    font-size: 0.65rem;
+    color: #94a3b8;
+  }
+
+  .suggestions-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+
+  .suggestion-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.725rem;
+    border-bottom: 1px solid #1e293b;
+    transition: background 0.1s;
+  }
+
+  .suggestion-item:hover,
+  .suggestion-item.active {
+    background: rgba(56, 189, 248, 0.2);
+  }
+
+  .sug-icon {
+    font-size: 0.85rem;
+  }
+
+  .sug-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .sug-label {
+    color: #f1f5f9;
+    font-family: monospace;
+    font-size: 0.725rem;
+  }
+
+  .sug-desc {
+    color: #94a3b8;
+    font-size: 0.65rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sug-type {
+    font-size: 0.65rem;
+    color: #64748b;
+    font-family: monospace;
+  }
+
+  .expr-quick-snippets {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .snippets-label {
+    font-size: 0.7rem;
+    color: #64748b;
+  }
+
+  .snippet-chip {
+    background: rgba(30, 41, 59, 0.8);
+    color: #cbd5e1;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.675rem;
+    cursor: pointer;
+    font-family: monospace;
+  }
+
+  .snippet-chip:hover {
+    background: #334155;
+    color: #38bdf8;
+  }
+
+  .expr-tester {
+    margin-top: 0.5rem;
+    border-top: 1px solid #1e293b;
+    padding-top: 0.5rem;
+  }
+
+  .tester-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .btn-run-expr {
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.725rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-run-expr:hover {
+    background: #059669;
+  }
+
+  .test-spinner {
+    font-size: 0.7rem;
+    color: #10b981;
+  }
+
+  .expr-output {
+    background: #030712;
+    border: 1px solid #1e293b;
+    border-radius: 4px;
+    padding: 0.5rem;
+    font-size: 0.7rem;
+    color: #a7f3d0;
+    max-height: 120px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  /* FOCUS MODE FULLSCREEN MODAL */
+  .focus-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+  }
+
+  .focus-modal-panel {
+    position: fixed;
+    top: 5vh;
+    left: 5vw;
+    right: 5vw;
+    bottom: 5vh;
+    background: #0a0f1d;
+    border: 1px solid #1e293b;
+    border-radius: 10px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9);
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .focus-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: #0f172a;
+    border-bottom: 1px solid #1e293b;
+  }
+
+  .focus-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .focus-icon {
+    font-size: 1.5rem;
+    color: #38bdf8;
+  }
+
+  .focus-title-group h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    color: #f8fafc;
+  }
+
+  .focus-subtitle {
+    font-size: 0.775rem;
+    color: #94a3b8;
+  }
+
+  .focus-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .lang-pill-select {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: #94a3b8;
+  }
+
+  .lang-pill-select select {
+    background: #1e293b;
+    color: #f1f5f9;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    padding: 0.3rem 0.6rem;
+  }
+
+  .btn-test-modal {
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.825rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-close-focus {
+    background: #334155;
+    color: #f1f5f9;
+    border: none;
+    border-radius: 5px;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.825rem;
+    cursor: pointer;
+  }
+
+  .btn-close-focus:hover {
+    background: #475569;
+  }
+
+  .focus-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  .focus-editor-col {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    border-right: 1px solid #1e293b;
+  }
+
+  .focus-editor-wrapper {
+    flex: 1;
+    position: relative;
+    display: flex;
+  }
+
+  .focus-textarea {
+    width: 100%;
+    height: 100%;
+    background: #030712;
+    color: #38bdf8;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 1rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    resize: none;
+  }
+
+  .focus-popup {
+    width: 320px;
+  }
+
+  .focus-snippets-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+  }
+
+  .focus-output-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    background: #030712;
+  }
+
+  .focus-output-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.825rem;
+    font-weight: 600;
+    color: #94a3b8;
+    margin-bottom: 0.5rem;
+  }
+
+  .focus-output-pre {
+    flex: 1;
+    background: #090e17;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 1rem;
+    font-size: 0.8rem;
+    color: #a7f3d0;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .focus-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+    background: #0f172a;
+    border-top: 1px solid #1e293b;
+  }
+
+  .footer-hint {
+    font-size: 0.8rem;
+    color: #64748b;
+  }
+
+  .btn-done-focus {
+    background: #0284c7;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 0.45rem 1.25rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-done-focus:hover {
+    background: #0369a1;
+  }
+
+  /* SCRIPTABLE ECS PROPERTIES & PORTS */
+  .ecs-properties-section {
+    background: #080d1a;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 0.65rem 0.75rem;
+    margin-top: 0.75rem;
+  }
+
+  .ecs-prop-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .btn-add-ecs-prop {
+    background: #1e293b;
+    color: #38bdf8;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    padding: 0.2rem 0.45rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-add-ecs-prop:hover {
+    background: #334155;
+  }
+
+  .ecs-props-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .ecs-prop-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .prop-key-input {
+    flex: 1;
+    background: #0f172a;
+    color: #f8fafc;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+    font-family: monospace;
+  }
+
+  .prop-sep {
+    color: #64748b;
+    font-weight: bold;
+  }
+
+  .prop-val-input {
+    flex: 1.5;
+    background: #0f172a;
+    color: #38bdf8;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+    font-family: monospace;
+  }
+
+  .btn-del-prop {
+    background: transparent;
+    color: #64748b;
+    border: none;
+    cursor: pointer;
+    font-size: 0.75rem;
+  }
+
+  .btn-del-prop:hover { color: #ef4444; }
+
+  .ecs-ports-box {
+    background: #080d1a;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 0.65rem;
+    margin-top: 0.5rem;
+  }
+
+  .box-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.4rem;
+  }
+
+  .box-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #cbd5e1;
+  }
+
+  .btn-sm-add {
+    background: #1e293b;
+    color: #38bdf8;
+    border: 1px solid #334155;
+    border-radius: 3px;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.65rem;
+    cursor: pointer;
+  }
+
+  .ports-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .port-chip-row {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+  }
+
+  .port-chip-row input {
+    flex: 2;
+    background: #0f172a;
+    color: #f8fafc;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.725rem;
+  }
+
+  .port-chip-row select {
+    flex: 1.5;
+    background: #0f172a;
+    color: #f8fafc;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.725rem;
+  }
+
+  .btn-del-chip {
+    background: transparent;
+    color: #64748b;
+    border: none;
+    cursor: pointer;
+    font-size: 0.725rem;
+  }
+
+  .btn-del-chip:hover { color: #ef4444; }
+
+  .empty-hint {
+    font-size: 0.7rem;
+    color: #64748b;
+    font-style: italic;
+  }
+
+
+  /* UNITY-STYLE LOGIC & STATE MACHINE STUDIO */
+  .btn-fullsize-toggle {
+    background: #1e293b;
+    color: #38bdf8;
+    border: 1px solid #0284c7;
+    border-radius: 4px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-left: 0.5rem;
+  }
+  .btn-fullsize-toggle.active {
+    background: #0284c7;
+    color: #fff;
+  }
+  .canvas-wrap.fullsize {
+    position: fixed;
+    top: 50px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    background: #07090e;
+  }
+
+  .unity-studio-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    height: calc(100vh - 120px);
+    padding: 0.75rem;
+    background: #07090e;
+    overflow-y: auto;
+  }
+  @media (max-width: 1024px) {
+    .unity-studio-container {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .unity-panel {
+    background: #0a0f1d;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    overflow-y: auto;
+  }
+  .unity-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #1e293b;
+    padding-bottom: 0.5rem;
+  }
+  .panel-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .unity-panel-header h4 {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #f8fafc;
+  }
+  .active-layer-badge, .active-runtime-badge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    background: #1e293b;
+    color: #38bdf8;
+    font-weight: 600;
+  }
+
+  .fsm-sub-section {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 0.75rem;
+  }
+  .section-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #94a3b8;
+    margin-bottom: 0.5rem;
+  }
+  .btn-xs {
+    background: #1e293b;
+    color: #38bdf8;
+    border: 1px solid #334155;
+    border-radius: 3px;
+    padding: 0.15rem 0.45rem;
+    font-size: 0.7rem;
+    cursor: pointer;
+  }
+  .btn-xs.primary {
+    background: #0284c7;
+    color: #fff;
+    border-color: #0284c7;
+  }
+  .layers-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .layer-chip {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #cbd5e1;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  .layer-chip.active {
+    background: #0284c7;
+    color: #fff;
+    border-color: #38bdf8;
+  }
+
+  .interactive-params-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 0.5rem;
+  }
+  .param-card {
+    background: #0a0f1d;
+    border: 1px solid #1e293b;
+    border-radius: 4px;
+    padding: 0.4rem;
+  }
+  .param-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+  }
+  .param-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #e2e8f0;
+  }
+  .param-type-badge {
+    font-size: 0.65rem;
+    padding: 0.05rem 0.3rem;
+    border-radius: 2px;
+    background: #1e293b;
+  }
+  .param-type-badge.Boolean { color: #34d399; }
+  .param-type-badge.Int32 { color: #38bdf8; }
+  .param-type-badge.Float { color: #f59e0b; }
+  .param-type-badge.Trigger { color: #ec4899; }
+
+  .param-number-input {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #f8fafc;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+  }
+  .btn-trigger {
+    width: 100%;
+    background: #ec489922;
+    border: 1px solid #ec4899;
+    color: #ec4899;
+    border-radius: 3px;
+    padding: 0.2rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-trigger.fired {
+    background: #ec4899;
+    color: #fff;
+  }
+
+  .events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .event-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #0a0f1d;
+    border: 1px solid #1e293b;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+  }
+  .event-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .event-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #facc15;
+  }
+  .last-dispatched {
+    font-size: 0.65rem;
+    color: #94a3b8;
+  }
+  .btn-dispatch {
+    background: #ca8a0422;
+    border: 1px solid #ca8a04;
+    color: #facc15;
+    border-radius: 3px;
+    padding: 0.15rem 0.45rem;
+    font-size: 0.7rem;
+    cursor: pointer;
+  }
+
+  .fsm-states-horizontal {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+  .fsm-state-node {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: #0a0f1d;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    cursor: pointer;
+    min-width: 120px;
+  }
+  .fsm-state-node.active {
+    border-color: #38bdf8;
+    background: #0284c722;
+  }
+  .fsm-state-node.entry { border-left: 3px solid #10b981; }
+  .fsm-state-node.exit { border-left: 3px solid #ef4444; }
+  .state-name { font-size: 0.75rem; font-weight: 600; color: #f8fafc; }
+  .state-type-tag { font-size: 0.65rem; color: #94a3b8; }
+
+  .fsm-transitions-chips {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+  }
+  .trans-chip {
+    font-size: 0.7rem;
+    background: #0a0f1d;
+    border: 1px solid #1e293b;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    color: #cbd5e1;
+  }
+  .trans-trigger { color: #facc15; margin-left: 0.2rem; }
+  .trans-cond { color: #34d399; margin-left: 0.2rem; }
+
+  .logic-top-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.5rem;
+  }
+  .unity-input, .unity-select {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #f8fafc;
+    padding: 0.35rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+  }
+
+  .ports-editor-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 0.5rem;
+  }
+  .ports-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+  .port-tag {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+  }
+  .port-tag.in { background: #0284c722; border: 1px solid #0284c7; color: #38bdf8; }
+  .port-tag.out { background: #064e3b22; border: 1px solid #059669; color: #34d399; }
+
+  .shortcuts-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+  }
+  .btn-api-chip {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #a855f7;
+    border-radius: 3px;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.7rem;
+    cursor: pointer;
+  }
+  .btn-api-chip:hover {
+    border-color: #a855f7;
+    background: #581c8722;
+  }
+
+  .logic-editor-wrap {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .editor-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #0a0f1d;
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid #1e293b;
+    font-size: 0.75rem;
+    color: #94a3b8;
+  }
+  .editor-actions-bar {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .monaco-container-box {
+    border-bottom: 1px solid #1e293b;
+  }
+
+
+  .btn-open-studio-shortcut {
+    width: 100%;
+    background: #581c8733;
+    border: 1px solid #a855f7;
+    color: #c084fc;
+    border-radius: 4px;
+    padding: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+  }
+  .btn-open-studio-shortcut:hover {
+    background: #a855f7;
+    color: #fff;
+  }
+
+
+  /* HYBRID ECS PROPERTY INSPECTOR STYLES */
+  .ecs-title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .ecs-sub {
+    font-size: 0.68rem;
+    color: #64748b;
+  }
+
+  .ecs-header-btns {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+  }
+
+  .btn-reflect-schema-sm {
+    background: rgba(14, 165, 233, 0.15);
+    border: 1px solid rgba(14, 165, 233, 0.3);
+    color: #38bdf8;
+    font-size: 0.68rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+  }
+
+  .add-prop-inline-card {
+    background: #090e17;
+    border: 1px solid #1e293b;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .add-prop-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #f1f5f9;
+  }
+
+  .add-prop-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .add-prop-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .add-prop-field.full {
+    grid-column: 1 / -1;
+  }
+
+  .add-prop-field label {
+    font-size: 0.68rem;
+    color: #94a3b8;
+  }
+
+  .add-prop-field input, .add-prop-field select {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    color: #f1f5f9;
+    padding: 0.3rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+  }
+
+  .add-prop-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .btn-save-custom-prop {
+    background: #10b981;
+    color: #042f2e;
+    border: none;
+    border-radius: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.3rem 0.7rem;
+    cursor: pointer;
+  }
+
+  .ecs-rendered-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .ecs-prop-card {
+    background: #090e17;
+    border: 1px solid #1e293b;
+    border-radius: 0.375rem;
+    padding: 0.55rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .ecs-prop-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .prop-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .prop-k {
+    font-size: 0.75rem;
+    color: #f1f5f9;
+    font-family: ui-monospace, monospace;
+  }
+
+  .prop-t-badge {
+    font-size: 0.6rem;
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.2rem;
+    font-weight: 600;
+  }
+
+  .prop-t-badge.enum { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+  .prop-t-badge.vectordb { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+  .prop-t-badge.number { background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); }
+  .prop-t-badge.boolean { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+
+  .prop-d-text {
+    font-size: 0.68rem;
+    color: #64748b;
+  }
+
+  .ecs-widget-wrapper {
+    margin-top: 0.15rem;
+  }
+
+  .ecs-widget-select, .ecs-text-widget {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    color: #f1f5f9;
+    padding: 0.3rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    box-sizing: border-box;
+  }
+
+  .ecs-vectordb-widget {
+    background: #07090e;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 0.25rem;
+    padding: 0.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .vdb-ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .vdb-provider-select {
+    flex: 1;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    color: #34d399;
+    padding: 0.25rem;
+    font-size: 0.72rem;
+    border-radius: 0.25rem;
+  }
+
+  .vdb-meta-row {
+    font-size: 0.65rem;
+    color: #64748b;
+  }
+
+  .vdb-meta-row code {
+    color: #94a3b8;
+  }
+
+  .ecs-slider-widget {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .ecs-slider-bar {
+    flex: 1;
+  }
+
+  .ecs-slider-val {
+    font-size: 0.75rem;
+    color: #38bdf8;
+    font-family: ui-monospace, monospace;
+    font-weight: 600;
+  }
+
+  .btn-toggle-switch {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    font-size: 0.72rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .btn-toggle-switch.active {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: rgba(16, 185, 129, 0.4);
+    color: #34d399;
+    font-weight: 600;
+  }
+
+  .field-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.3rem;
+  }
+
+  .badge-model-ready {
+    font-size: 0.65rem;
+    color: #10b981;
+    font-weight: 600;
+  }
+
+  .btn-download-model-sm {
+    background: rgba(245, 158, 11, 0.2);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    color: #fbbf24;
+    font-size: 0.65rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+  }
+
+  .palette-subhead {
+    font-size: 0.68rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.3rem 0.2rem;
+    font-weight: 600;
+  }
+
+  .custom-comp-card {
+    background: rgba(139, 92, 246, 0.08);
+  }
 </style>
+

@@ -1,4 +1,6 @@
 import { EventEmitter } from 'events';
+import fs from 'fs';
+import path from 'path';
 
 export interface LogEntry {
   id: number;
@@ -14,9 +16,30 @@ class LogStore extends EventEmitter {
   private entries: LogEntry[] = [];
   private nextId = 1;
   private capacity = 2000;
+  private logFilePath: string;
 
   constructor() {
     super();
+    // Resolve project root logs directory
+    const candidates = [
+      path.resolve(process.cwd(), 'logs'),
+      path.resolve(process.cwd(), '../../../../logs'),
+      path.resolve(process.cwd(), '../logs')
+    ];
+    let resolvedDir = candidates[0];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) {
+        resolvedDir = c;
+        break;
+      }
+    }
+    try {
+      if (!fs.existsSync(resolvedDir)) {
+        fs.mkdirSync(resolvedDir, { recursive: true });
+      }
+    } catch {}
+    this.logFilePath = path.join(resolvedDir, 'platform_errors.log');
+
     this.add({
       timestamp: new Date().toISOString(),
       level: 'Information',
@@ -39,6 +62,14 @@ class LogStore extends EventEmitter {
     this.entries.push(fullEntry);
     if (this.entries.length > this.capacity) {
       this.entries.shift();
+    }
+
+    // Persist Error and Warning logs to disk for diagnostics
+    if (fullEntry.level === 'Error' || fullEntry.level === 'Warning' || fullEntry.exception) {
+      try {
+        const line = `[${fullEntry.timestamp}] [${fullEntry.level}] [${fullEntry.category}] ${fullEntry.message}${fullEntry.exception ? `\nException: ${fullEntry.exception}` : ''}\n`;
+        fs.appendFileSync(this.logFilePath, line, 'utf8');
+      } catch {}
     }
 
     this.emit('log', fullEntry);

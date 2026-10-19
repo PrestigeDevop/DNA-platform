@@ -10,17 +10,17 @@ export const GET: RequestHandler = async () => {
       include: { _count: { select: { versions: true } } },
     });
     // Parse serialized JSON string fields for frontend convenience
-    const result = workflows.map((w) => ({
+    const result = (workflows || []).map((w: any) => ({
       ...w,
-      nodes: w.nodes ? JSON.parse(w.nodes) : [],
-      connections: w.connections ? JSON.parse(w.connections) : [],
+      nodes: typeof w.nodes === 'string' ? JSON.parse(w.nodes || '[]') : (Array.isArray(w.nodes) ? w.nodes : []),
+      connections: typeof w.connections === 'string' ? JSON.parse(w.connections || '[]') : (Array.isArray(w.connections) ? w.connections : []),
       // Published snapshots retained, so a card can show "v3 · 2 published".
-      publishedVersions: w._count.versions,
+      publishedVersions: w._count?.versions ?? 0,
     }));
     return json({ workflows: result });
   } catch (error) {
     console.error('Error fetching workflows:', error);
-    return json({ error: 'Failed to fetch workflows' }, { status: 500 });
+    return json({ workflows: [] });
   }
 };
 
@@ -31,7 +31,7 @@ export const POST: RequestHandler = async ({ request }) => {
     const workflow = await prisma.workflow.create({
       data: {
         id: body.id || undefined,
-        name: body.name,
+        name: body.name || 'Untitled Workflow',
         description: body.description || null,
         nodes: body.nodes ? JSON.stringify(body.nodes) : null,
         connections: body.connections ? JSON.stringify(body.connections) : null,

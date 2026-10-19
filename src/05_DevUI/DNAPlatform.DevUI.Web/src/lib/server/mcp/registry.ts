@@ -6,6 +6,8 @@ import path from 'path';
 export interface McpToolSchema {
   name: string;
   description: string;
+  role?: 'assistant' | 'worker' | 'system' | 'evaluator';
+  enabled?: boolean;
   inputSchema: {
     type: 'object';
     properties: Record<string, { type: string; description?: string; default?: any }>;
@@ -18,6 +20,7 @@ export interface McpServer {
   name: string;
   version: string;
   status: 'Running' | 'Stopped' | 'Error';
+  enabled?: boolean;
   description: string;
   category: string;
   tools: McpToolSchema[];
@@ -395,6 +398,15 @@ class McpRegistry {
   }
 
   register(server: McpServer) {
+    if (server.enabled === undefined) server.enabled = true;
+    for (const t of server.tools) {
+      if (t.enabled === undefined) t.enabled = true;
+      if (!t.role) {
+        if (t.name.includes('validation') || t.name.includes('verify')) t.role = 'evaluator';
+        else if (t.name.includes('diagnostics') || t.name.includes('time') || t.name.includes('status')) t.role = 'system';
+        else t.role = 'worker';
+      }
+    }
     this.servers.set(server.serverId, server);
     logStore.add({
       timestamp: new Date().toISOString(),
@@ -413,14 +425,51 @@ class McpRegistry {
     return Array.from(this.servers.values());
   }
 
+  toggleServer(serverId: string, enabled?: boolean): boolean {
+    const server = this.getServer(serverId);
+    if (!server) return false;
+    server.enabled = enabled !== undefined ? enabled : !server.enabled;
+    server.status = server.enabled ? 'Running' : 'Stopped';
+    logStore.add({
+      timestamp: new Date().toISOString(),
+      level: 'Information',
+      category: 'MCP',
+      message: `MCP Server '${serverId}' toggled: ${server.enabled ? 'ENABLED' : 'DISABLED'}`,
+      source: 'backend'
+    });
+    return server.enabled;
+  }
+
+  toggleTool(serverId: string, toolName: string, enabled?: boolean): boolean {
+    const server = this.getServer(serverId);
+    if (!server) return false;
+    const tool = server.tools.find((t) => t.name === toolName);
+    if (!tool) return false;
+    tool.enabled = enabled !== undefined ? enabled : !tool.enabled;
+    logStore.add({
+      timestamp: new Date().toISOString(),
+      level: 'Information',
+      category: 'MCP',
+      message: `MCP Tool '${serverId}/${toolName}' toggled: ${tool.enabled ? 'ENABLED' : 'DISABLED'}`,
+      source: 'backend'
+    });
+    return tool.enabled;
+  }
+
   async callTool(serverId: string, toolName: string, args: Record<string, any>): Promise<any> {
     const server = this.getServer(serverId);
     if (!server) {
       throw new Error(`MCP Server '${serverId}' not found`);
     }
+    if (server.enabled === false) {
+      throw new Error(`MCP Server '${serverId}' is currently DISABLED in runtime configuration`);
+    }
     const tool = server.tools.find((t) => t.name === toolName);
     if (!tool) {
       throw new Error(`Tool '${toolName}' not found on server '${serverId}'`);
+    }
+    if (tool.enabled === false) {
+      throw new Error(`MCP Tool '${serverId}/${toolName}' is currently DISABLED in runtime configuration`);
     }
 
     logStore.add({

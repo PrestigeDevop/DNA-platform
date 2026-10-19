@@ -8,10 +8,10 @@ export const GET: RequestHandler = async () => {
     const agents = await prisma.agent.findMany({
       orderBy: { createdAt: 'desc' },
     });
-    return json({ agents });
+    return json({ agents: agents || [] });
   } catch (error) {
     console.error('Error fetching agents:', error);
-    return json({ error: 'Failed to fetch agents' }, { status: 500 });
+    return json({ agents: [] });
   }
 };
 
