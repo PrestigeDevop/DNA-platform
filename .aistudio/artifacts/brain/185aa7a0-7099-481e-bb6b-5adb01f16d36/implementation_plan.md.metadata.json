@@ -1,6 +1,6 @@
 {
-  "summary": "Architectural blueprint and execution plan for updating the Logic Component & Extension Authoring Studio, implementing native tool annotations (C# [Tool], Python @tool, JS JSDoc/decorator) with automatic mise runtime detection, hybrid custom ECS node property reflection (enums, vector DBs, thresholds), and building an interactive multi-turn test console with expandable tool execution cards in the Agents page.",
-  "updatedAt": "2026-10-19T08:52:25.619689474Z",
-  "requestFeedback": true,
-  "userFacing": true
+  "summary":  "Comprehensive architectural specification and implementation plan for the .NET Core Workflow Platform with SvelteKit UI, Embedded Polyglot Kernel, Real MCP Server (with mise toolchain), JSON Marketplace packaging, Agentic Tool Exposition, WebSocket JSON-RPC LSP bridge, and animated cross-platform CLI Tooling SDK with dynamic Python execution.",
+  "updatedAt":  "2026-10-27T19:10:16.941275354Z",
+  "requestFeedback":  true,
+  "userFacing":  true
 }

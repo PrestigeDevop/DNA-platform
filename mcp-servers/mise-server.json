@@ -1,0 +1,11 @@
+{
+  "serverId": "mise-toolchain",
+  "name": "Mise Toolchain MCP",
+  "version": "1.0.0",
+  "command": "node",
+  "args": ["mcp-servers/mise-mcp/index.js"],
+  "env": {
+    "MISE_BIN": "/usr/local/bin/mise"
+  },
+  "description": "Thin genuine wrapper exposing the real mise CLI over stdio MCP (mise_list, mise_install, mise_current, mise_doctor, mise_plugins, mise_run)."
+}

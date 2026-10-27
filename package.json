@@ -3,13 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "src/05_DevUI/DNAPlatform.DevUI.Web"
-  ],
   "scripts": {
-    "dev": "npm run dev --workspace=src/05_DevUI/DNAPlatform.DevUI.Web",
-    "build": "npm run build --workspace=src/05_DevUI/DNAPlatform.DevUI.Web",
-    "preview": "npm run preview --workspace=src/05_DevUI/DNAPlatform.DevUI.Web",
+    "dev": "npm run dev --prefix src/05_DevUI/DNAPlatform.DevUI.Web",
+    "build": "npm run build --prefix src/05_DevUI/DNAPlatform.DevUI.Web",
+    "preview": "npm run preview --prefix src/05_DevUI/DNAPlatform.DevUI.Web",
     "start": "node ./scripts/3-denovo-automata.mjs",
     "bootstrap": "node ./scripts/1-bootstrap.mjs",
     "test": "node ./scripts/2-test-dev.mjs",
@@ -17,6 +14,9 @@
     "clean": "node ./scripts/2-test-dev.mjs --clean",
     "smoketest": "node ./scripts/2-test-dev.mjs",
     "tui": "node ./scripts/dna.js tui",
-    "cli": "node ./scripts/dna.js"
+    "cli": "node ./scripts/dna.js",
+    "interactive": "node ./scripts/dna.js interactive",
+    "mise": "node ./scripts/dna.js mise",
+    "mcp:mise": "node mcp-servers/mise-mcp/index.js"
   }
 }

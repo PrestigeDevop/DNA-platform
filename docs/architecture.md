@@ -1,63 +1,260 @@
-# DeNovoAutomata — Architecture Guide
+# DeNovoAutomata — Architecture & System Requirements Guide
 
-> **Platform Classification**: Low-code / no-code bioinformatic platform for computational biology workflows, autonomous AI agents, and polyglot algorithm execution.
-
----
-
-## 1. Executive Overview
-
-**DeNovoAutomata** is a low-code/no-code bioinformatic platform that bridges compiled high-performance .NET execution with the extensive biological computing ecosystem of Python. It enables bioinformaticians, clinical researchers, and software engineers to:
-- Visually compose Directed Acyclic Graph (DAG) computational biology pipelines on a drag-and-drop canvas (inspired by n8n).
-- Execute zero-copy polyglot bioinformatics routines via the **CSnakes** Python-C# bridge.
-- Deploy autonomous AI agents governed by the **AG-UI Protocol** with real-time reasoning traces and Human-in-the-Loop (HITL) approval interrupts.
-- Manage runs across multiple interfaces: a reactive web studio (SvelteKit 2), a native console TUI (`Terminal.Gui`), and cross-platform command-line tools.
+> **Platform Classification**: Enterprise low-code/no-code bioinformatic platform with .NET Core workflow engine, SvelteKit web studio, embedded Polyglot Kernel, genuine Model Context Protocol (MCP) server integrated with `mise`, agentic tool exposition, and cross-platform CLI SDK.
 
 ---
 
-## 2. System Architecture Diagram
+## 1. Executive Overview & System Topology
+
+**DeNovoAutomata** unites high-performance compiled .NET 8/9 execution with the scientific computing ecosystem of Python and modern web visualization. It enables bioinformaticians, clinical researchers, and software engineers to:
+- Visually compose Directed Acyclic Graph (DAG) computational biology pipelines on a drag-and-drop WYSIWYG canvas.
+- Act as a **native Model Context Protocol (MCP) Server** integrated with `mise` (`mise mcp`) for dynamic dependency isolation (NuGet, npm, pip).
+- Execute multi-language code cells in-process through an **embedded .NET Interactive Polyglot Kernel** (C#, F#, Python via CSnakes, JavaScript, PowerShell).
+- Edit code nodes with syntax highlighting, diagnostics, and upstream variable autocompletion via a **WebSocket JSON-RPC Language Server Protocol (LSP)** bridge.
+- Deploy autonomous AI agents governed by the **AG-UI Protocol** with real-time reasoning traces (`THINKING_DELTA`) and Human-in-the-Loop (`APPROVAL_REQUESTED`) interrupts.
+- Package, publish, and install modules through a **JSON Marketplace** (`dna-module.json`) that unpacks UI inspectors directly into the workflow canvas.
+- Drive development from a cross-platform animated **CLI Tooling SDK** (`scripts/dna.js`) with an interactive menu and dynamic Python execution engine.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                       DeNovoAutomata Interface Layer                        │
-│  SvelteKit 2 Web Studio (Port 3000 / 5173)   │  Terminal.Gui C# TUI (CLI)   │
-│  - Drag-and-Drop WYSIWYG Workflow Canvas     │  - Native Windows/Linux TUI  │
-│  - AG-UI Human-in-the-Loop Approval Modal    │  - Real-time Health Monitor  │
-│  - Polyglot Interactive Code Kernel (Python) │  - Interactive Server Menu   │
-└───────────────────────┬───────────────────────────────┬─────────────────────┘
-                        │ HTTP / SSE                    │ HTTP
-                        ▼                               ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      Service & Protocol Gateway Layer                       │
-│                                                                             │
-│   ASP.NET Core 8 API (:5254)             AG-UI Hosting Server (:5000)       │
-│   - Minimal APIs & Attribute Routes      - AG-UI Protocol v1.0.0 (net8.0)  │
-│   - Runtime Environment Introspection    - SSE Streaming (Thinking Traces) │
-│   - LogStore & Diagnostic Ring Buffer    - Human-in-the-Loop Interrupts    │
-└───────────────────────┬───────────────────────────────┬─────────────────────┘
-                        │                               │
-                        └───────────────┬───────────────┘
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      Single Unified Execution Engine                        │
-│               src/03_AgentWorkflowPatterns/DNAPlatform.AgentFramework       │
-│                                                                             │
-│   WorkflowOrchestrator   │   AgentManager   │   NodeExecutor                │
-│   - Topological DAG Sort │   - Local ONNX   │   - Input / Output Nodes      │
-│   - Cycle Detection      │   - Copilot Flow │   - Loop & Conditional Nodes  │
-│   - Async Parallel Step  │   - Permissions  │   - ProcessingSkill Nodes     │
-└───────────────────────┬───────────────────────────────┬─────────────────────┘
-                        │                               │
-                        ▼                               ▼
-┌───────────────────────────────────────┐ ┌───────────────────────────────────┐
-│       Core Polyglot Bridge            │ │       Skill & MCP Registry        │
-│   src/01_Core/DNAPlatform.Core        │ │   src/06_Skills                   │
-│                                       │ │                                   │
-│   - CSnakes Python-C# Interop Bridge  │ │   - Needleman-Wunsch Aligner      │
-│   - Zero-Copy Biological Marshaling   │ │   - C# High-Precision Clock       │
-│   - DNA/RNA/Protein Sequence Metrics  │ │   - IUPAC Genetic Validator       │
-│   - GC Skew & Reading Frame Analysis  │ │   - Custom Script Dynamic Loader  │
-└───────────────────────────────────────┘ └───────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                 DeNovoAutomata Frontend                                  │
+│  SvelteKit 2 Web Studio (:3000)                                                         │
+│  ├── WYSIWYG Workflow Canvas & Node Graph       ├── /studio Playground (3-Subtab Testbed)│
+│  ├── Monaco Editor + WebSocket JSON-RPC LSP     ├── AG-UI Human-in-the-Loop Modal      │
+│  └── JSON Marketplace & Component Inspector     └── De Novo Workflow Demonstration Hub  │
+└───────────────────────────┬─────────────────────────────────┬───────────────────────────┘
+                            │ HTTP / SSE / REST               │ WebSocket (JSON-RPC)
+                            ▼                                 ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                           Service Gateway & Runtime Protocols                           │
+│                                                                                         │
+│  ASP.NET Core 8/9 Web API (:5254)             Language Server Protocol (LSP) Bridge     │
+│  ├── Minimal APIs & Route Dispatchers         ├── Roslyn C# Diagnostics & Autocomplete  │
+│  ├── Skill Registry & Module Manager          ├── Monaco JSON-RPC over WebSockets       │
+│  └── Runtime Environment Introspection        └── Upstream Variable Schema Injection    │
+│                                                                                         │
+│  AG-UI Protocol Server (:5000)                Genuine mise MCP Server (stdio / :3000)   │
+│  ├── SSE Streaming (Cognitive Traces)         ├── Model Context Protocol JSON-RPC 2.0   │
+│  ├── HITL Interrupts & Resumption             ├── Dynamic Language Toolchain Sandbox    │
+│  └── JSON Patch (RFC 6902) State Deltas       └── mise install / isolate (pip/npm/nuget)│
+└───────────────────────────┬─────────────────────────────────┬───────────────────────────┘
+                            │                                 │
+                            └────────────────┬────────────────┘
+                                             ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                           Unified .NET Core Execution Engine                            │
+│                 src/03_AgentWorkflowPatterns/DNAPlatform.AgentFramework                  │
+│                                                                                         │
+│   WorkflowOrchestrator   │   Embedded Polyglot Kernel   │   Agent & Tool Registry       │
+│   ├── Topological Sort   │   ├── .NET Interactive       │   ├── Copilot Local ONNX      │
+│   ├── Cycle Detection    │   ├── C# / F# In-Process     │   ├── [McpTool] Discovery     │
+│   ├── State Delta Engine │   ├── CSnakes Python C-API   │   ├── Granular Permissions    │
+│   └── Node Execution     │   └── JS / PowerShell cells  │   └── Agent Context Injection │
+└───────────────────────────┬─────────────────────────────────┬───────────────────────────┘
+                            │                                 │
+                            ▼                                 ▼
+┌───────────────────────────────────────────┐ ┌───────────────────────────────────────────┐
+│            Core Polyglot Bridge           │ │            Skill & Tool Modules           │
+│        src/01_Core/DNAPlatform.Core       │ │         src/06_Skills & Marketplace       │
+│                                           │ │                                           │
+│   - CSnakes Python-C# Interop Bridge      │ │   - Needleman-Wunsch Aligner              │
+│   - Zero-Copy Biological Marshaling       │ │   - C# High-Precision Timestamp Provider  │
+│   - DNA/RNA/Protein Sequence Metrics      │ │   - IUPAC Genetic Sequence Validator      │
+│   - GC Skew & Reading Frame Analysis      │ │   - Installed JSON Marketplace Packages   │
+└───────────────────────────────────────────┘ └───────────────────────────────────────────┘
 ```
+
+---
+
+## 2. Core Architectural Components & Requirements
+
+### 2.1 Backend: .NET Core Workflow Engine & Native MCP Server
+
+#### Workflow & Graph Core
+The workflow engine evaluates Directed Acyclic Graphs (DAGs) serialized as JSON schemas:
+- **Topological Sorting**: Kahn's algorithm resolves execution sequences and validates that the graph is strictly acyclic.
+- **Node Execution Isolation**: Each node executes inside a sandboxed scope receiving upstream outputs mapped through explicit connections (`sourceNodeId`, `targetNodeId`, `outputKey`, `inputKey`).
+- **State Delta Engine**: Tracks incremental state mutations via RFC 6902 JSON Patch (`STATE_DELTA`) across workflow steps.
+
+#### Real MCP Server Implementation
+The platform implements the **Model Context Protocol (MCP)** specification (2024-11-05):
+- **Transport**: Supports both `stdio` (for CLI/Copilot desktop integration) and HTTP/SSE (`/api/mcp/sse`) for web clients.
+- **Protocol Capabilities**:
+  - `tools/list`: Enumerates all active native tools and marketplace modules.
+  - `tools/call`: Executes registered C#, Python, or shell tools with strict schema validation.
+  - `prompts/list` & `prompts/get`: Provides parameterized bioinformatic reasoning templates.
+  - `resources/list` & `resources/read`: Streams workspace artifacts (e.g., FASTA files, alignment reports, LIMS specs).
+
+#### Developer API & SDK Attributes
+Developers annotate C# classes and methods with platform attributes for automatic MCP and UI exposure:
+
+```csharp
+using System.ComponentModel;
+using DNAPlatform.Core.Attributes;
+
+namespace DNAPlatform.Modules.Bioinformatics;
+
+[McpServer("dna-genomics", Version = "1.0.0")]
+[Description("Genomics analysis and sequence manipulation toolset.")]
+public class GenomicsModule
+{
+    [McpTool("calculate_gc_skew", "Calculates GC content and GC skew (G - C)/(G + C) for a DNA sequence.")]
+    public static GcSkewResult CalculateGcSkew(
+        [McpParameter("Nucleotide sequence (A, C, G, T, N)", Required = true)] string sequence,
+        [McpParameter("Sliding window size in base pairs", Required = false)] int windowSize = 100)
+    {
+        int g = 0, c = 0;
+        foreach (char b in sequence.ToUpperInvariant())
+        {
+            if (b == 'G') g++;
+            else if (b == 'C') c++;
+        }
+        double skew = (g + c) == 0 ? 0.0 : (double)(g - c) / (g + c);
+        double gcPercent = sequence.Length == 0 ? 0.0 : ((double)(g + c) / sequence.Length) * 100.0;
+
+        return new GcSkewResult(sequence.Length, g, c, gcPercent, Math.Round(skew, 4));
+    }
+}
+
+public record GcSkewResult(int Length, int GCount, int CCount, double GcPercentage, double GcSkew);
+```
+
+#### Embedded Polyglot Kernel Server (.NET Interactive & CSnakes)
+- **Engine**: In-process `.NET Interactive` composite kernel hosting C# (`csharp`), F# (`fsharp`), and PowerShell.
+- **Python Runtime**: Powered by **CSnakes**, embedding Python 3.12 directly into the .NET process with zero-overhead memory pointers and no inter-process serialization latency.
+- **Sandboxing**: Restricts file system write locations to the `workspace/` directory and sets timeout caps per cell execution (default: 30,000ms).
+
+---
+
+### 2.2 SvelteKit Frontend & Web Editor Environment
+
+#### WYSIWYG Workflow Canvas
+- **Visual Graph**: SVG-based dynamic connection lines with cubic Bézier curves, port snapping, drag-and-drop node positioning, and mini-map navigation.
+- **Per-Node State Reflection**: Live visual state chips (`Pending`, `Running`, `Completed`, `Failed`, `Approval Requested`) with animated data-flow pulses.
+- **Inspector Panel**: Unity-inspired component inspector automatically rendering controls based on node metadata:
+  - Enums $\rightarrow$ `<select>` dropdowns.
+  - Number ranges $\rightarrow$ Sliders with step increments.
+  - Boolean flags $\rightarrow$ Toggle switches.
+  - Code expressions $\rightarrow$ Monaco editor with LSP autocomplete.
+
+#### Monaco Editor with WebSocket JSON-RPC LSP Bridge
+- Code editor nodes hook into an LSP (Language Server Protocol) server over WebSockets (`ws://127.0.0.1:3000/api/lsp` or backend `:5254`).
+- **Capabilities**:
+  - Live syntax diagnostics and squiggly error markers for C# (Roslyn) and Python (Pyright).
+  - Contextual autocompletion injecting upstream node data schemas into the global scope:
+    ```javascript
+    // Autocompletion provides live upstream properties:
+    inputs.sequence         // [DNA_Sequence] Upstream FASTA
+    inputs.gcPercentage     // [Float] Calculated GC score
+    inputs.selectedSpacer   // [String] 20-nt CRISPR guide RNA
+    ```
+
+---
+
+### 2.3 Package Management & 'mise mcp' Dependency Resolution
+
+#### Mise MCP Integration
+The platform delegates language runtime provisioning to `mise` (`https://mise.jdx.dev`):
+- The backend communicates with `mcp-servers/mise-mcp/index.js` over stdio JSON-RPC.
+- When a workflow node or marketplace package requires a specific runtime (e.g., Python 3.12, .NET 8, Node.js 20, Rust), `mise` dynamically resolves, installs, and isolates the toolchain in `.mise.toml` virtual environments.
+
+#### JSON Marketplace Module Packaging Standard
+Modules are published as `.tar.gz` packages containing a `dna-module.json` manifest:
+
+```json
+{
+  "$schema": "https://dnaplatform.org/schemas/module-v1.json",
+  "name": "crispr-cas9-optimizer",
+  "version": "1.2.0",
+  "displayName": "CRISPR-Cas9 Off-Target & Oligo Synthesis",
+  "description": "Scans genomic sequences for PAM motifs, evaluates off-target penalties via CSnakes, and synthesizes Golden Gate oligos.",
+  "author": "DNA Platform Core Team",
+  "category": "Genomics",
+  "icon": "🧬",
+  "runtimes": {
+    "dotnet": ">=8.0.0",
+    "python": ">=3.11.0"
+  },
+  "dependencies": {
+    "nuget": [
+      { "package": "Bio.Core", "version": "3.0.0" }
+    ],
+    "pip": [
+      { "package": "biopython", "version": ">=1.83" },
+      { "package": "numpy", "version": ">=1.26.0" }
+    ],
+    "npm": []
+  },
+  "uiComponent": {
+    "nodeType": "CrisprCas9Node",
+    "inspectorFields": [
+      { "name": "pamMotif", "type": "enum", "label": "PAM Motif", "options": ["NGG", "NAG", "NNGRRT"], "default": "NGG" },
+      { "name": "maxOffTargetRisk", "type": "float", "label": "Max Off-Target Risk", "min": 0.01, "max": 0.1, "default": 0.05 }
+    ]
+  },
+  "tools": [
+    {
+      "name": "crispr_scan_spacers",
+      "description": "Extracts 20-nt guide RNA spacers matching specified PAM motif.",
+      "entryPoint": "CrisprModule.ScanSpacers",
+      "language": "csharp"
+    }
+  ]
+}
+```
+
+#### Automated Installation Pipeline
+1. **Download & Verification**: Downloads package archive, verifies SHA-256 checksum, and performs AST security scans.
+2. **Mise Toolchain Provisioning**: Automatically runs `mise install` for requested language runtimes.
+3. **Dependency Restoration**: Invokes package managers (`nuget restore`, `pip install -r requirements.txt`, `npm install --production`).
+4. **Palette & Tool Registry Injection**: Registers the new node type into the SvelteKit Workflow Designer palette and the Agent MCP Tool Registry without restarting the application server.
+
+---
+
+### 2.4 Agentic Tool Exposition & The `/studio` Route
+
+#### AI Agent Integration & User Grant Access
+- Any installed module annotated with `[McpTool]` is registered into the **Agent Tool Registry**.
+- When an administrator or user grants an AI Agent access to a module:
+  - The tool's JSON schema (name, description, input parameters) is injected into the Agent's system context.
+  - LLMs (Local ONNX Copilot, Phi-3.5, or remote models) can invoke backend methods via the standard MCP `tools/call` JSON-RPC protocol.
+  - If the module requires sensitive operations, the **AG-UI Protocol** halts execution with an `APPROVAL_REQUESTED` interrupt for operator verification.
+
+#### The Studio Route (`/studio`)
+The dedicated playground and developer testing ground provides 3 sub-tabs:
+1. **Polyglot Kernel**: Live multi-language scratchpad executing C#, Python (CSnakes), and Node.js cells with instant stdout capture.
+2. **Smart Component Authoring**: Real-time code compiler extracting `[Tool]` attributes and rendering live Unity-style inspectors.
+3. **Real-Time Agent Interaction**: Interactive agent chat panel testing tool call generation, argument filling, MCP invocation, and AG-UI HITL interrupts.
+
+---
+
+### 2.5 Cross-Platform CLI Tooling SDK (`scripts/dna.js`)
+
+The CLI serves as the unified entry point for developers and automation pipelines:
+- **Animated Startup**: Features an animated ASCII DNA double-helix banner with color spectrum transitions.
+- **Interactive Menu**:
+  ```
+  ╔════════════════════════════════════════════════════════════════════════════╗
+  ║                     🧬 DNA PLATFORM UNIFIED CLI & TUI                     ║
+  ║           Polyglot Bioinformatics, Agent Framework & AG-UI Hosting         ║
+  ╚════════════════════════════════════════════════════════════════════════════╝
+
+  Main Menu:
+    [1] 🚀 Start All Servers (DevUI + API + AG-UI) — run-all
+    [2] 🧪 Run Automated SmokeTest
+    [3] ⚙️ Bootstrap Toolchain & SQLite Database
+    [4] 🧹 Clean Workspace Artifacts
+    [5] 📡 Probe Polyglot Environment (CSnakes & .NET)
+    [6] ⚡ Test AG-UI Protocol Stream
+    [7] 📓 Launch Microsoft .NET Interactive REPL (port 8888)
+    [8] 🧰 Run Mise Toolchain MCP Server / Doctor
+    [9] 🐍 Execute Dynamic Python Code & CSnakes Annotations
+    [0] 🚪 Exit
+  ```
+- **Dynamic Python Execution Engine (`dna python` / `dna py`)**:
+  - Provides quick bioinformatics calculations (reverse complement, GC skew, PAM extraction, codon translation).
+  - Evaluates arbitrary inline Python statements with instant timing and output capture.
+  - Generates MCP tool annotations for Python classes and functions.
 
 ---
 
@@ -74,111 +271,51 @@
 │   │   ├── DNAPlatform.DevUI.API/         # ASP.NET Core 8 Web API (Port 5254)
 │   │   ├── DNAPlatform.DevUI.AGUI/        # AG-UI protocol hosting server (Port 5000)
 │   │   └── DNAPlatform.DevUI.Web/         # SvelteKit 2 frontend & Prisma SQLite persistence (Port 3000)
+│   │       ├── src/lib/components/        # WorkflowDesigner, WorkflowDemonstration, MonacoEditor
+│   │       ├── src/lib/data/              # Client-safe demo workflows & schemas
+│   │       ├── src/lib/server/            # Prisma client, seedData, and workflow orchestrator
+│   │       └── src/routes/
+│   │           ├── studio/                # /studio Route (Polyglot Kernel, Authoring, Agent Chat)
+│   │           ├── workflows/             # /workflows Route (Interactive Demonstration Hub & Library)
+│   │           ├── kernel/                # /kernel Route (.NET Interactive & CSnakes Playground)
+│   │           └── agents/                # /agents Route (Agent Registry & Copilot ONNX)
 │   ├── 06_Skills/
 │   │   ├── DNAPlatform.Skills/            # Skill catalog (Needleman-Wunsch, C# Clock, IUPAC Validator)
 │   │   └── DNAPlatform.Skills.Core/       # Core skill contracts & base interfaces
 │   ├── 07_CLI/
 │   │   └── DNAPlatform.Cli/               # Native C# Terminal.Gui TUI & HTTP CLI client
-│   ├── 08_ACP/                            # Standalone Agent Client Protocol (Zed JSON-RPC) adapter
 │   └── 09_Tests/
 │       └── DNAPlatform.Tests/             # xUnit test suite for the workflow orchestrator
+├── mcp-servers/
+│   └── mise-mcp/                          # Genuine mise MCP Server (stdio JSON-RPC)
 ├── scripts/
 │   ├── 1-bootstrap.mjs                    # Script 1: First-time toolchain install & Prisma database sync
 │   ├── 2-test-dev.mjs                     # Script 2: Agentic E2E test suite with pre-push artifact clean
-│   └── 3-denovo-automata.mjs              # Script 3: DeNovoAutomata lightweight animated runner with TUI
+│   ├── 3-denovo-automata.mjs              # Script 3: DeNovoAutomata lightweight animated runner with TUI
+│   └── dna.js                             # Unified Cross-Platform CLI Tooling SDK with dynamic Python menu
 ├── docs/
-│   ├── architecture.md                    # System architecture, folder structure, agentic guide, gotchas
-│   └── development.md                     # Consolidated dev logs, task lists, and milestone roadmap
+│   ├── architecture.md                    # This document: architecture, system requirements, schemas
+│   ├── development.md                     # Consolidated development logs, task lists, and roadmap
+│   └── tools/
+│       └── mcp-mise-interactive-tooling.md# MCP server guide, mise toolchain, and troubleshooting
 ├── metadata.json                          # Applet metadata and capabilities
-├── package.json                           # Root workspace configuration and npm commands
+├── package.json                           # Root workspace configuration and npm scripts
 └── README.md                              # User-facing platform introduction
 ```
 
 ---
 
-## 4. Overview for Agentic Development
+## 4. Operational Guidelines & Gotchas
 
-DeNovoAutomata supports agentic AI development across workflows and standalone agents:
-
-### 4.1 AG-UI Protocol & Human-in-the-Loop (HITL)
-The platform natively hosts the **AG-UI Protocol** (`https://docs.ag-ui.com/sdk/dotnet/hosting/overview`):
-- **Cognitive Traces (`THINKING_DELTA`)**: The agent emits real-time inner monologue reasoning before invoking tools or synthesizing outputs.
-- **Human-in-the-Loop Interrupts (`APPROVAL_REQUESTED`)**: If an agent attempts to execute a sensitive tool (such as mutating DNA sequences, running external scripts, or writing files), execution is suspended. The client UI renders an interactive authorization card.
-- **Approval Resumption**: When authorized by the user, the client dispatches a resumption request (`POST /api/agui` with `approvals: [{ toolCallId, approved: true }]`). Execution resumes, updates shared state via RFC 6902 JSON Patch (`STATE_DELTA`), streams response tokens (`TEXT_DELTA`), and closes with `RUN_FINISHED`.
-
-### 4.2 Agent Personas & Skill Binding
-- Agents configured in `/agents` are backed by local ONNX models (e.g. `Microsoft-Copilot-Local-ONNX`, `Phi-3.5-mini-ONNX`).
-- Agents can be assigned arbitrary skills from `src/06_Skills/` and external MCP servers (Model Context Protocol).
-- Workflow nodes of type `Agent` pass upstream output into dynamic Prompt Flow templates and pipe agent reasoning to downstream nodes.
-
----
-
-## 5. Developmental Gaps
-
-*(This section is currently empty as all baseline requirements, AG-UI protocol streaming, CSnakes core bridge, Terminal.Gui TUI, and the 3 cross-platform scripts are fully implemented and verified.)*
-
-> **Architectural Decisions & Limitations Guideline**:
-> - Future platform limitations or prospective architecture trade-offs (e.g., PostgreSQL/pgvector migration vs SQLite, remote agent transport models) will be logged in this section.
-> - **Rule**: The agent will consult the user when addressing architectural ambiguities or trade-offs before altering core execution primitives.
-
----
-
-## 6. Gotchas & Operational Guidelines
-
-1. **Routing Ownership in DevUI**:
-   - SvelteKit server routes shadow the Vite proxy. CRUD routes (`/api/workflows`, `/api/agents`, `/api/executions`) are handled directly by SvelteKit's Prisma/SQLite layer.
-   - Only backend compute routes (`/api/skills`, `/api/node-types`, `/api/environment`) are proxied to the .NET backend.
-   - SvelteKit routes return lowercase JSON keys (`{ workflows, workflow }`), while .NET endpoints return PascalCase keys (`{ Count, Skills }`).
-
-2. **Database Persistence with SQLite**:
-   - SQLite has no native JSON column type. Complex objects (`Workflow.nodes`, `Workflow.connections`, `Execution.nodeResults`) are serialized as JSON strings in the database and parsed by route handlers.
-   - `DATABASE_URL` must always start with `file:`. The database abstraction layer in `src/lib/server/db.ts` automatically normalizes paths to prevent query engine initialization failures.
-
-3. **Linux Globalization (ICU)**:
-   - On Linux systems where system ICU libraries are absent, .NET requires `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1`. This is configured in `mise.toml` and environment definitions.
-
-4. **Port Allocation**:
+1. **Svelte 4 Template Non-Null & Type Assertions**:
+   - Svelte 4 template expressions `{...}` parse standard ECMAScript only. TypeScript assertions (`as any`, `testingAgent!`) cause fatal build errors.
+   - **Rule**: Perform all type checking and null checks inside `<script lang="ts">`.
+2. **SvelteKit Module Boundaries (`$lib/server/*`)**:
+   - Files under `src/lib/server/` cannot be imported into client components. Shared definitions must reside under `src/lib/data/` or `src/lib/types/`.
+3. **Single Execution Engine Mandate**:
+   - `src/03_AgentWorkflowPatterns/DNAPlatform.AgentFramework` is the **single** orchestrator across the repository. Never create secondary execution double engines.
+4. **Port Allocations**:
    - `3000`: SvelteKit Web UI Dev Server.
    - `5254`: ASP.NET Core 8 Web API.
    - `5000`: AG-UI SSE Protocol Server.
-
-### Access Points
-
-| Component / Interface | URL / Binding | Protocol | Key Endpoints |
-|---|---|---|---|
-| **SvelteKit Web Studio** | `http://localhost:3000` (or `:5173`) | HTTP / HTML5 | `/workflows`, `/agents`, `/skills`, `/executions`, `/logs` |
-| **ASP.NET Core 8 Backend** | `http://localhost:5254` | HTTP / REST | `/swagger`, `/health`, `/api/info`, `/api/environment`, `/api/skills` |
-| **AG-UI Protocol Server** | `http://localhost:5000` | HTTP / SSE | `/api/agui` (Server-Sent Events streaming with HITL interrupts) |
-| **Terminal.Gui C# TUI** | Console (`npm run tui` or `dnaplatform tui`) | stdio / Terminal | Windowed TUI dashboard with menu, health probe, and status bar |
-| **ACP Adapter** | `src/08_ACP` (`node dist/index.js`) | stdio / JSON-RPC | `initialize`, `session/new`, `session/prompt`, `session/cancel` |
-| **Polyglot CSnakes Kernel** | `http://localhost:3000/api/polyglot/execute` | HTTP POST | Python 3, C# Interactive, JavaScript, and Bash cell execution |
-
-### Troubleshooting
-
-1. **Port Conflicts (`address already in use`)**:
-   - Backend (:5254) or AG-UI (:5000) or Web (:3000) is held by an orphaned background process.
-   - **Fix on Linux/macOS**: `lsof -i :5254` then `kill -9 <PID>`.
-   - **Fix on Windows**: `netstat -ano | findstr :5254` then `taskkill /PID <PID> /F`.
-   - Or run the pre-clean command: `npm run test:clean` / `node scripts/2-test-dev.mjs --clean`.
-
-2. **SQLite `file:` Protocol Validation (`Error validating datasource db`)**:
-   - Prisma's SQLite connector strictly requires the `file:` scheme.
-   - `src/lib/server/db.ts` automatically normalizes `process.env.DATABASE_URL` to `file:<absolute_path>/dev.db`.
-   - If resetting manually: run `npm run bootstrap` to regenerate and push the schema.
-
-3. **Linux Globalization (ICU missing)**:
-   - Exception: `Process terminated. Couldn't find a valid ICU package on that assembly`.
-   - **Fix**: Export `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` before launching dotnet or use `mise run dev`.
-
-4. **SvelteKit Route Shadowing & Vite Proxy**:
-   - SvelteKit server routes (`src/routes/api/...`) take precedence over Vite's `server.proxy`.
-   - If a route returns unexpected data or 404, verify whether it is handled by SvelteKit's Prisma handlers or proxied to .NET in `src/05_DevUI/DNAPlatform.DevUI.Web/vite.config.ts`.
-
----
-
-## 7. Final Intent Summarized
-
-DeNovoAutomata's final objective is to be an **open, visual, n8n-inspired computational biology workbench**:
-- **Zero Heavy Infrastructure**: Runs locally on Linux, macOS, and Windows with zero configuration overhead.
-- **The 3 Focused Scripts**: Initial setup (`npm run bootstrap`), development testing/cleaning (`npm test`), and immediate startup (`npm start`).
-- **Autonomous Governance**: AI agents act as active computational participants while giving human operators complete visibility through real-time thinking traces and Human-in-the-Loop authorization.
+   - `8888`: Microsoft .NET Interactive Jupyter Server.

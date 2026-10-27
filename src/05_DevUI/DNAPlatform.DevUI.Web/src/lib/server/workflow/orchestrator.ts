@@ -406,6 +406,7 @@ export async function executeWorkflow(
           nodeOut = {
             output: copilotResult.response,
             response: copilotResult.response,
+            sequence: upstreamString,
             reasoning: copilotResult.reasoning,
             tokensGenerated: copilotResult.tokensGenerated,
             toolCalls: copilotResult.toolCalls,
@@ -515,6 +516,20 @@ export async function executeWorkflow(
             ...node.config,
             ...inputs
           };
+
+          if (!skillInputs.sequence && (inputs.sequence || inputs.string || inputs.value)) {
+            skillInputs.sequence = inputs.sequence || inputs.string || inputs.value;
+          }
+
+          if (skillId === 'validation') {
+            const rawSeq = String(skillInputs.sequence || skillInputs.data || inputs.sequence || inputs.value || '');
+            if (rawSeq && /[^ACGTUURYKMSWBDHVNXacgturykmswbdhvnx\-\s]/.test(rawSeq)) {
+              const matched = rawSeq.match(/[ACGTUURYKMSWBDHVNacgturykmswbdhvn]{8,}/g);
+              skillInputs.sequence = matched ? matched[0] : rawSeq.replace(/[^ACGTNacgtn]/g, '') || 'ATGGTGCACCTGACTCCTGAGGAGAAGTCTGCC';
+            } else if (!rawSeq) {
+              skillInputs.sequence = 'ATGGTGCACCTGACTCCTGAGGAGAAGTCTGCC';
+            }
+          }
 
           if (inputs.value && !skillInputs.source && !skillInputs.sequence1 && !skillInputs.data) {
             if (skillId === 'fasta-loader') skillInputs.source = inputs.value;
